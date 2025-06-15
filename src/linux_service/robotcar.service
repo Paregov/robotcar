@@ -1,0 +1,27 @@
+# /etc/systemd/system/robotcar.service
+# Systemd unit file for the Python script.
+
+[Unit]
+Description=RobotCar startup script.
+# This says that the script should only start after the network is ready.
+# Remove this if your script doesn't need network access.
+After=network.target
+
+[Service]
+# Command to execute. Use full paths.
+ExecStart=/usr/bin/python3 /home/paregov/robotcar/startup.py
+# The user that will run the script. 'pi' is the default user.
+User=paregov
+# The group that will run the script. 'pi' is the default group.
+Group=paregov
+# Working directory for the script.
+WorkingDirectory=/home/paregov/robotcar/
+# Restart the service if it fails.
+Restart=always
+# How long to wait before restarting.
+RestartSec=10
+
+[Install]
+# This line is needed to enable the service to start on boot.
+# 'multi-user.target' is the standard runlevel for a non-graphical, multi-user system.
+WantedBy=multi-user.target
