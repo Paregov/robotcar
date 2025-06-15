@@ -52,3 +52,15 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+.idea/
+.vscode/
+.vs/
+__Previews/
+Project Logs*/
+Project Outputs*/
+
+NetworkController.zip
+*.csproj.user
+*.log
+*.Cam
