@@ -23,11 +23,17 @@ A picoboot3 will be used, so update of the firmware can be done over the air (OT
 
 [GitHub - IndoorCorgi/picoboot3: Custom bootloader that allows firmware updates to Raspberry Pi Pico via UART/I2C/SPI.](https://github.com/IndoorCorgi/picoboot3)
 
-The code here will be in C++.
+You will need to download the pre-compiled `picoboot3.uf2` file and flash the Raspberry Pi Pico 2 (2350 CPU). 
+
+[Releases · IndoorCorgi/picoboot3 · GitHub](https://github.com/IndoorCorgi/picoboot3/releases)
+
+
+
+The code here will be in C/C++.
 
 To build: 
 
-Open the Pico - Developer PowerShell.
+Open the `Pico - Developer PowerShell` from the Start menu.
 
 cd to the project
 
@@ -37,21 +43,27 @@ cmake ..
 ninja
 ```
 
+
+
 ### REST API server
+
+**Note: You need to install Raspbian with user `pi` or if you want another user you need to change it in all places where I am assuming user is `pi`.**
 
 The Raspberry Pi Zero 2W should be powerful enough to handle simple REST API server. The implementation will be in C# (.NET8). 
 
 It will perform also the OTA update of the low level controller firmware.
 
-These links are to test the installation. Once it is done will leave the working one.
 
-[Install .NET 8 on Raspberry pi � GitHub](https://gist.github.com/ramonsmits/b15d97965bcfacc19920be2e84b49c4e)
 
-This is more promissing
+Install all the updates of Raspbian.
 
-[Install and use Microsoft Dot NET 8 with the Raspberry Pi - Pete Codes](https://www.petecodes.co.uk/install-and-use-microsoft-dot-net-8-with-the-raspberry-pi/)
+```bash
+sudo apt update && sudo apt upgrade -y
+```
 
-To install .NET 8 use this command in Raspberry Pi Zero 2W
+
+
+To install .NET 8 use this command in Raspberry Pi 5B or Zero 2W
 
 ```bash
 wget -O - https://raw.githubusercontent.com/pjgpetecodes/dotnet8pi/main/install.sh | sudo bash
@@ -85,7 +97,7 @@ Go to "SPI"
 
 Do the same for the I2C.
 
-All files for the project will be in the **~/robotcar**
+All files for the project will be in the **/home/pi/robotcar**
 
 Install picoboot3 updater.
 
@@ -93,21 +105,29 @@ Install picoboot3 updater.
 pip3 install picoboot3 --break-system-packages
 ```
 
-Step 1: Create Your Python Script
-First, create your Python script. For this example, let's make a simple script that blinks an LED connected to GPIO 17 and writes the current time to a log file every 10 seconds.
 
-Save this script in your home directory, for example, at /home/pi/myscript.py. You can find the code for myscript.py in the code block below this guide.
+
+```bash
+pip3 install packaging --break-system-packages
+```
+
+
+Copy the starup script onto the Raspberry Pi.
+
+`src\RobotCarRest\startup.py`
+
+
 
 Important: Make your script executable using the chmod command in the terminal:
 
 ```bash
-chmod +x /home/pi/myscript.py
+chmod +x /home/pi/robotcar/startup.py
 ```
 
 Step 2: Copy the robotcar.system file
 
 ```bash
-sudo cp robotcar.service /etc/systemd/system/robotcar.service
+sudo cp /home/pi/robotcar/robotcar.service /etc/systemd/system/robotcar.service
 ```
 
 Step 3: Enable and Start the Service
@@ -138,10 +158,18 @@ You can check if your service is running correctly at any time.
 sudo systemctl status robotcar.service
 ```
 
+If you need to stop the service:
+
+```bash
+sudo systemctl stop robotcar.service
+```
+
+
+
 To see the output from your script (anything it prints), you can use journalctl:
 
 ```bash
-journalctl -u myservice.service -f
+journalctl -u robotcar.service -f
 ```
 
 The -f flag will "follow" the log, showing new output in real-time.
@@ -150,8 +178,12 @@ The -f flag will "follow" the log, showing new output in real-time.
 
 I am working on Windows and the setup is for this envoronment.
 
-1. Install Raspberry Pi Pico SDK - [Raspberry Pi Pico Windows Installer - Raspberry Pi](https://www.raspberrypi.com/news/raspberry-pi-pico-windows-installer/)
+I will mention the Raspberry Pi Pico SDK installer - [Raspberry Pi Pico Windows Installer - Raspberry Pi](https://www.raspberrypi.com/news/raspberry-pi-pico-windows-installer/) - so it is known that it was checked. This is the old way and it is no longer updated.
 
-2. Check this article on the VS Code pico extension and how to get started - [Get started with Raspberry Pi Pico-series and VS Code - Raspberry Pi](https://www.raspberrypi.com/news/get-started-with-raspberry-pi-pico-series-and-vs-code/)
+1. Check this article on the VS Code pico extension and how to get started - [Get started with Raspberry Pi Pico-series and VS Code - Raspberry Pi](https://www.raspberrypi.com/news/get-started-with-raspberry-pi-pico-series-and-vs-code/)
+   
+   This is the official way to install the SDK now.
 
-3. Install Visual Studio 2022 Community Edition
+2. Install Visual Studio 2022 Community Edition
+
+3. Optionally I like to have PyCharm for the Python code.

@@ -31,7 +31,7 @@ typedef struct
 typedef struct
 {
     // Direction of the motor: 1 for forward, -1 for backward.
-    int8_t dirction;
+    int8_t direction;
 
     // Speed in percentage.
     uint8_t speed;

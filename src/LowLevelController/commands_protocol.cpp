@@ -28,7 +28,7 @@ void process_commands_protocol()
     }
     
     motor_speed_t motor_speed = {
-        .dirction = (int8_t)command.data[0], // Direction
+        .direction = (int8_t)command.data[0], // Direction
         .speed = command.data[1], // Speed in percentage (0-100)
         .timeout = (int16_t)((uint16_t)command.data[2] << 8 | command.data[3]) // Timeout in milliseconds
     };

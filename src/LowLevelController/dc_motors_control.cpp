@@ -18,8 +18,8 @@ const uint RIGHT_MOTOR_FORWARD_PIN = 14;    // IN4
 const uint RIGHT_MOTOR_BACKWARD_PIN = 15;   // IN3
 
 motor_speed_t dc_motors_speeds[2] = {
-    { .dirction = 0, .speed = 0, .timeout = 0 }, // Left motor
-    { .dirction = 0, .speed = 0, .timeout = 0 }  // Right motor
+    { .direction = 0, .speed = 0, .timeout = 0 }, // Left motor
+    { .direction = 0, .speed = 0, .timeout = 0 }  // Right motor
 };
 
 struct repeating_timer dc_motors_control_timer;
@@ -36,7 +36,7 @@ void process_dc_motor_speed(
     {
         // Stop the motor if timeout has reached
         motor->speed = 0;
-        motor->dirction = 0;
+        motor->direction = 0;
         motor->timeout = 0; // Reset timeout
 
         set_pwm_duty_cycle_in_percent(pwm_index, 0);
@@ -46,13 +46,13 @@ void process_dc_motor_speed(
         return;
     }
 
-    if (motor->dirction > 0)
+    if (motor->direction > 0)
     {
         // Forward direction
         gpio_put(gpio_forward, 1);
         gpio_put(gpio_backward, 0);
     }
-    else if (motor->dirction < 0)
+    else if (motor->direction < 0)
     {
         // Backward direction
         gpio_put(gpio_forward, 0);
@@ -112,8 +112,8 @@ void init_dc_motors()
     gpio_put(RIGHT_MOTOR_BACKWARD_PIN, 0);
 
     set_dc_motors_speed(
-        (motor_speed_t){ .dirction = 0, .speed = 0, .timeout = 0 }, // Left motor
-        (motor_speed_t){ .dirction = 0, .speed = 0, .timeout = 0 }  // Right motor
+        (motor_speed_t){ .direction = 0, .speed = 0, .timeout = 0 }, // Left motor
+        (motor_speed_t){ .direction = 0, .speed = 0, .timeout = 0 }  // Right motor
     );
     
     // Create a repeating timer that calls dc_motors_timer_callback.

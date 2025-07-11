@@ -53,7 +53,7 @@ try
         $fileStreamLength = $fileBytes.Length
         Write-Verbose "File size is $fileStreamLength bytes."
         
-        $ApiUrl = "http://192.168.200.54:5000/api/v1/software/firmware"
+        $ApiUrl = "http://192.168.200.85:5000/api/v1/software/firmware"
         $headers = @{
             "Content-Type" = "application/octet-stream"
         }

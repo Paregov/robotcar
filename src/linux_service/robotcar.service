@@ -9,13 +9,13 @@ After=network.target
 
 [Service]
 # Command to execute. Use full paths.
-ExecStart=/usr/bin/python3 /home/paregov/robotcar/startup.py
+ExecStart=/usr/bin/python3 /home/pi/robotcar/startup.py
 # The user that will run the script. 'pi' is the default user.
-User=paregov
+User=pi
 # The group that will run the script. 'pi' is the default group.
-Group=paregov
+Group=pi
 # Working directory for the script.
-WorkingDirectory=/home/paregov/robotcar/
+WorkingDirectory=/home/pi/robotcar/
 # Restart the service if it fails.
 Restart=always
 # How long to wait before restarting.

@@ -8,106 +8,217 @@
 #include "servo_control.hpp"
 
 #define TIMER_INTERVAL_US 10000
+#define TIMER_INTERVAL_MS (TIMER_INTERVAL_US / 1000)
 
-#define BASE_MOTOR_INDEX 0
-#define SHOULDER_MOTOR_INDEX 1
-#define ELBOW_MOTOR_INDEX 2
-#define ARM_MOTOR_INDEX 3
-#define WRIST_MOTOR_INDEX 4
-#define GRIPPER_MOTOR_INDEX 6
+#define SERVO_SPEED_TABLE_SIZE 10
 
-#define ELAPSED_TIME_MS_10_PERCENT 100
-#define ELAPSED_TIME_MS_20_PERCENT 90
-#define ELAPSED_TIME_MS_30_PERCENT 80
-#define ELAPSED_TIME_MS_40_PERCENT 70
-#define ELAPSED_TIME_MS_50_PERCENT 60
-#define ELAPSED_TIME_MS_60_PERCENT 50
-#define ELAPSED_TIME_MS_70_PERCENT 40
-#define ELAPSED_TIME_MS_80_PERCENT 30
-#define ELAPSED_TIME_MS_90_PERCENT 20
-#define ELAPSED_TIME_MS_100_PERCENT 10
+typedef struct {
+    uint8_t min_percentage; // Minimum speed percentage.
+    uint8_t max_percentage; // Maximum speed percentage.
+    uint16_t min_time_ms;   // Minimum time in milliseconds before change degrees.
+} servo_speed_settings_t;
 
 const servo_info_t servo_180 = {
     .degrees = 180,
+    .bottom_degrees_limit = 0,
+    .top_degrees_limit = 180,
     .left_us = 500.0f,
     .center_us = 1500.0f,
     .right_us = 2500.0f,
-    .degree_to_us = (2500.0f - 500.0f) / 180.0f
+    .degree_to_us = ((2500.0f - 500.0f) / 180.0f),
+    .pwm_number = 0,    // This will be set later in init_servos()
+    .is_inverted = false
 };
 
 const servo_info_t servo_270 = {
     .degrees = 270,
+    .bottom_degrees_limit = 0,
+    .top_degrees_limit = 270,
     .left_us = 500.0f,
     .center_us = 1500.0f,
     .right_us = 2500.0f,
-    .degree_to_us = (2500.0f - 500.0f) / 270.0f
+    .degree_to_us = ((2500.0f - 500.0f) / 270.0f),
+    .pwm_number = 0,    // This will be set later in init_servos()
+    .is_inverted = false
+};
+
+const servo_speed_settings_t servos_speed_table[SERVOS_COUNT][SERVO_SPEED_TABLE_SIZE] = {
+    {   // Base servo speed settings
+        { .min_percentage = 10, .max_percentage = 20, .min_time_ms = 110 },
+        { .min_percentage = 20, .max_percentage = 30, .min_time_ms = 100 }, 
+        { .min_percentage = 30, .max_percentage = 40, .min_time_ms = 90 }, 
+        { .min_percentage = 40, .max_percentage = 50, .min_time_ms = 80 },
+        { .min_percentage = 50, .max_percentage = 60, .min_time_ms = 70 },
+        { .min_percentage = 60, .max_percentage = 70, .min_time_ms = 60 },
+        { .min_percentage = 70, .max_percentage = 80, .min_time_ms = 50 },
+        { .min_percentage = 80, .max_percentage = 90, .min_time_ms = 40 },
+        { .min_percentage = 90, .max_percentage = 100, .min_time_ms = 30 },
+        { .min_percentage = 100, .max_percentage = 110, .min_time_ms = 20 }
+    },
+    {   // Shoulder servo speed settings
+        { .min_percentage = 10, .max_percentage = 20, .min_time_ms = 110 },
+        { .min_percentage = 20, .max_percentage = 30, .min_time_ms = 100 }, 
+        { .min_percentage = 30, .max_percentage = 40, .min_time_ms = 90 }, 
+        { .min_percentage = 40, .max_percentage = 50, .min_time_ms = 80 },
+        { .min_percentage = 50, .max_percentage = 60, .min_time_ms = 70 },
+        { .min_percentage = 60, .max_percentage = 70, .min_time_ms = 60 },
+        { .min_percentage = 70, .max_percentage = 80, .min_time_ms = 50 },
+        { .min_percentage = 80, .max_percentage = 90, .min_time_ms = 40 },
+        { .min_percentage = 90, .max_percentage = 100, .min_time_ms = 30 },
+        { .min_percentage = 100, .max_percentage = 110, .min_time_ms = 20 }
+    },
+    {   // Elbow servo speed settings
+        { .min_percentage = 10, .max_percentage = 20, .min_time_ms = 100 },
+        { .min_percentage = 20, .max_percentage = 30, .min_time_ms = 90 }, 
+        { .min_percentage = 30, .max_percentage = 40, .min_time_ms = 80 }, 
+        { .min_percentage = 40, .max_percentage = 50, .min_time_ms = 70 },
+        { .min_percentage = 50, .max_percentage = 60, .min_time_ms = 60 },
+        { .min_percentage = 60, .max_percentage = 70, .min_time_ms = 50 },
+        { .min_percentage = 70, .max_percentage = 80, .min_time_ms = 40 },
+        { .min_percentage = 80, .max_percentage = 90, .min_time_ms = 30 },
+        { .min_percentage = 90, .max_percentage = 100, .min_time_ms = 20 },
+        { .min_percentage = 100, .max_percentage = 110, .min_time_ms = 10 }
+    },
+    {   // Arm used right now
+        { .min_percentage = 10, .max_percentage = 20, .min_time_ms = 100 },
+        { .min_percentage = 20, .max_percentage = 30, .min_time_ms = 90 }, 
+        { .min_percentage = 30, .max_percentage = 40, .min_time_ms = 80 }, 
+        { .min_percentage = 40, .max_percentage = 50, .min_time_ms = 70 },
+        { .min_percentage = 50, .max_percentage = 60, .min_time_ms = 60 },
+        { .min_percentage = 60, .max_percentage = 70, .min_time_ms = 50 },
+        { .min_percentage = 70, .max_percentage = 80, .min_time_ms = 40 },
+        { .min_percentage = 80, .max_percentage = 90, .min_time_ms = 30 },
+        { .min_percentage = 90, .max_percentage = 100, .min_time_ms = 20 },
+        { .min_percentage = 100, .max_percentage = 110, .min_time_ms = 10 }
+    },
+    {   // Wrist servo speed settings
+        { .min_percentage = 10, .max_percentage = 20, .min_time_ms = 100 },
+        { .min_percentage = 20, .max_percentage = 30, .min_time_ms = 90 }, 
+        { .min_percentage = 30, .max_percentage = 40, .min_time_ms = 80 }, 
+        { .min_percentage = 40, .max_percentage = 50, .min_time_ms = 70 },
+        { .min_percentage = 50, .max_percentage = 60, .min_time_ms = 60 },
+        { .min_percentage = 60, .max_percentage = 70, .min_time_ms = 50 },
+        { .min_percentage = 70, .max_percentage = 80, .min_time_ms = 40 },
+        { .min_percentage = 80, .max_percentage = 90, .min_time_ms = 30 },
+        { .min_percentage = 90, .max_percentage = 100, .min_time_ms = 20 },
+        { .min_percentage = 100, .max_percentage = 110, .min_time_ms = 10 }
+    },
+    {   // Not used
+        { .min_percentage = 10, .max_percentage = 20, .min_time_ms = 100 },
+        { .min_percentage = 20, .max_percentage = 30, .min_time_ms = 90 }, 
+        { .min_percentage = 30, .max_percentage = 40, .min_time_ms = 80 }, 
+        { .min_percentage = 40, .max_percentage = 50, .min_time_ms = 70 },
+        { .min_percentage = 50, .max_percentage = 60, .min_time_ms = 60 },
+        { .min_percentage = 60, .max_percentage = 70, .min_time_ms = 50 },
+        { .min_percentage = 70, .max_percentage = 80, .min_time_ms = 40 },
+        { .min_percentage = 80, .max_percentage = 90, .min_time_ms = 30 },
+        { .min_percentage = 90, .max_percentage = 100, .min_time_ms = 20 },
+        { .min_percentage = 100, .max_percentage = 110, .min_time_ms = 10 }
+    },
+    {   // Gripper servo speed settings
+        { .min_percentage = 10, .max_percentage = 20, .min_time_ms = 100 },
+        { .min_percentage = 20, .max_percentage = 30, .min_time_ms = 90 }, 
+        { .min_percentage = 30, .max_percentage = 40, .min_time_ms = 80 }, 
+        { .min_percentage = 40, .max_percentage = 50, .min_time_ms = 70 },
+        { .min_percentage = 50, .max_percentage = 60, .min_time_ms = 60 },
+        { .min_percentage = 60, .max_percentage = 70, .min_time_ms = 50 },
+        { .min_percentage = 70, .max_percentage = 80, .min_time_ms = 40 },
+        { .min_percentage = 80, .max_percentage = 90, .min_time_ms = 30 },
+        { .min_percentage = 90, .max_percentage = 100, .min_time_ms = 20 },
+        { .min_percentage = 100, .max_percentage = 110, .min_time_ms = 10 }
+    },
+    {   // Not used
+        { .min_percentage = 10, .max_percentage = 20, .min_time_ms = 100 },
+        { .min_percentage = 20, .max_percentage = 30, .min_time_ms = 90 }, 
+        { .min_percentage = 30, .max_percentage = 40, .min_time_ms = 80 }, 
+        { .min_percentage = 40, .max_percentage = 50, .min_time_ms = 70 },
+        { .min_percentage = 50, .max_percentage = 60, .min_time_ms = 60 },
+        { .min_percentage = 60, .max_percentage = 70, .min_time_ms = 50 },
+        { .min_percentage = 70, .max_percentage = 80, .min_time_ms = 40 },
+        { .min_percentage = 80, .max_percentage = 90, .min_time_ms = 30 },
+        { .min_percentage = 90, .max_percentage = 100, .min_time_ms = 20 },
+        { .min_percentage = 100, .max_percentage = 110, .min_time_ms = 10 }
+    }
 };
 
 servo_info_t servos_info_array[SERVOS_COUNT];
 
 motor_speed_t servo_motor_speeds_array[SERVOS_COUNT] = {
-    { .dirction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
-    { .dirction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
-    { .dirction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
-    { .dirction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
-    { .dirction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
-    { .dirction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
-    { .dirction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
-    { .dirction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 }
+    { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
+    { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
+    { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
+    { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
+    { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
+    { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
+    { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
+    { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 }
 };
 
 struct repeating_timer servo_control_timer;
 
+bool should_servo_move(
+    servo_speed_settings_t *settings,
+    uint8_t speed_percentage,
+    uint16_t time_elapsed)
+{
+    for (int i = 0; i < SERVO_SPEED_TABLE_SIZE; i++)
+    {
+        if (speed_percentage >= settings[i].min_percentage &&
+            speed_percentage < settings[i].max_percentage &&
+            time_elapsed >= settings[i].min_time_ms)
+        {
+            // The servo should move
+            return true;
+        }
+    }
+
+    // The servo should not move
+    return false;
+}
+
 void process_servo_motor_speed(motor_speed_t *motor, uint8_t motor_index)
 {
-    // Convert microseconds to milliseconds
-    uint32_t time_in_ms = (TIMER_INTERVAL_US / 1000);
-    
-    motor->timeout -= time_in_ms;
+    motor->timeout -= TIMER_INTERVAL_MS;
     if (motor->timeout <= 0)
     {
         // Stop the motor if timeout has reached
         motor->speed = 0;
-        motor->dirction = 0;
+        motor->direction = 0;
         motor->timeout = 0; // Reset timeout
 
         return;
     }
 
-    motor->elapsed_time += time_in_ms;
+    motor->elapsed_time += TIMER_INTERVAL_MS;
 
-    if (
-        (motor->speed >= 10 && motor->speed < 20
-        && motor->elapsed_time >= ELAPSED_TIME_MS_10_PERCENT) ||
-        (motor->speed >= 20 && motor->speed < 30
-        && motor->elapsed_time >= ELAPSED_TIME_MS_20_PERCENT) ||
-        (motor->speed >= 30 && motor->speed < 40
-        && motor->elapsed_time >= ELAPSED_TIME_MS_30_PERCENT) ||
-        (motor->speed >= 40 && motor->speed < 50
-        && motor->elapsed_time >= ELAPSED_TIME_MS_40_PERCENT) ||
-        (motor->speed >= 50 && motor->speed < 60
-        && motor->elapsed_time >= ELAPSED_TIME_MS_50_PERCENT) ||
-        (motor->speed >= 60 && motor->speed < 70
-        && motor->elapsed_time >= ELAPSED_TIME_MS_60_PERCENT) ||
-        (motor->speed >= 70 && motor->speed < 80
-        && motor->elapsed_time >= ELAPSED_TIME_MS_70_PERCENT) ||
-        (motor->speed >= 80 && motor->speed < 90
-        && motor->elapsed_time >= ELAPSED_TIME_MS_80_PERCENT) ||
-        (motor->speed >= 90 && motor->speed < 100
-        && motor->elapsed_time >= ELAPSED_TIME_MS_90_PERCENT) ||
-        (motor->speed >= 100 && motor->elapsed_time >= ELAPSED_TIME_MS_100_PERCENT)
-    )
+    // Check if the servo should move based on its speed settings
+    if (should_servo_move(
+        (servo_speed_settings_t *)servos_speed_table[motor_index],
+        motor->speed,
+        motor->elapsed_time))
     {
         uint16_t new_degrees = servos_info_array[motor_index].current_degrees;
         uint8_t pwm_number = servos_info_array[motor_index].pwm_number;
+        bool is_inverted = servos_info_array[motor_index].is_inverted;
 
-        if (motor->dirction > 0)
+        if (motor->direction > 0 && !is_inverted)
         {
+            // If the motor is moving forward and not inverted, increase degrees
             new_degrees += 1;
         }
-        else if (motor->dirction < 0)
+        else if (motor->direction > 0 && is_inverted)
         {
+            // If the motor is moving forward and inverted, decrease degrees
             new_degrees -= 1;
+        }
+        else if (motor->direction < 0 && !is_inverted)
+        {
+            // If the motor is moving backward and not inverted, decrease degrees
+            new_degrees -= 1;
+        }
+        else if (motor->direction < 0 && is_inverted)
+        {
+            new_degrees += 1;
         }
 
         motor->elapsed_time = 0; // Reset elapsed time after processing
@@ -116,7 +227,6 @@ void process_servo_motor_speed(motor_speed_t *motor, uint8_t motor_index)
         set_servo_position_in_degrees(pwm_number, new_degrees);
     }
 }
-
 
 /*
  * @brief Callback function for the repeating timer.
@@ -129,48 +239,61 @@ void process_servo_motor_speed(motor_speed_t *motor, uint8_t motor_index)
  */
 bool servo_motors_timer_callback(struct repeating_timer *t)
 {
-    process_servo_motor_speed(&servo_motor_speeds_array[BASE_MOTOR_INDEX], 0);
-    process_servo_motor_speed(&servo_motor_speeds_array[SHOULDER_MOTOR_INDEX], 1);
-    process_servo_motor_speed(&servo_motor_speeds_array[ELBOW_MOTOR_INDEX], 2);
-    process_servo_motor_speed(&servo_motor_speeds_array[ARM_MOTOR_INDEX], 3);
-    process_servo_motor_speed(&servo_motor_speeds_array[WRIST_MOTOR_INDEX], 4);
-    process_servo_motor_speed(&servo_motor_speeds_array[GRIPPER_MOTOR_INDEX], 6);
+    process_servo_motor_speed(&servo_motor_speeds_array[BASE_MOTOR_INDEX], BASE_MOTOR_INDEX);
+    process_servo_motor_speed(&servo_motor_speeds_array[SHOULDER_MOTOR_INDEX], SHOULDER_MOTOR_INDEX);
+    process_servo_motor_speed(&servo_motor_speeds_array[ELBOW_MOTOR_INDEX], ELBOW_MOTOR_INDEX);
+    process_servo_motor_speed(&servo_motor_speeds_array[ARM_MOTOR_INDEX], ARM_MOTOR_INDEX);
+    process_servo_motor_speed(&servo_motor_speeds_array[WRIST_MOTOR_INDEX], WRIST_MOTOR_INDEX);
+    process_servo_motor_speed(&servo_motor_speeds_array[GRIPPER_MOTOR_INDEX], GRIPPER_MOTOR_INDEX);
 
     return true; // Keep the timer repeating
 }
 
 void init_servos()
 {
-    servos_info_array[0] = servo_270;
-    servos_info_array[0].pwm_number = 0;
+    // Base
+    servos_info_array[BASE_MOTOR_INDEX] = servo_270;
+    servos_info_array[BASE_MOTOR_INDEX].pwm_number = 0;
 
-    servos_info_array[1] = servo_270;
-    servos_info_array[1].pwm_number = 1;
+    // Shoulder
+    servos_info_array[SHOULDER_MOTOR_INDEX] = servo_270;
+    servos_info_array[SHOULDER_MOTOR_INDEX].pwm_number = 1;
+    servos_info_array[SHOULDER_MOTOR_INDEX].is_inverted = true; // Inverted for this robot arm
+    //servos_info_array[SHOULDER_MOTOR_INDEX].bottom_degrees_limit = 45;
+    //servos_info_array[SHOULDER_MOTOR_INDEX].top_degrees_limit = 225;
 
-    servos_info_array[2] = servo_270;
-    servos_info_array[2].pwm_number = 2;
+    // Elbow
+    servos_info_array[ELBOW_MOTOR_INDEX] = servo_270;
+    servos_info_array[ELBOW_MOTOR_INDEX].pwm_number = 2;
 
-    servos_info_array[3] = servo_270;
-    servos_info_array[3].pwm_number = 3;
+    // Arm
+    servos_info_array[ARM_MOTOR_INDEX] = servo_270;
+    servos_info_array[ARM_MOTOR_INDEX].pwm_number = 3;
 
-    servos_info_array[4] = servo_270; 
-    servos_info_array[4].pwm_number = 4;
+    // Wrist
+    servos_info_array[WRIST_MOTOR_INDEX] = servo_270; 
+    servos_info_array[WRIST_MOTOR_INDEX].pwm_number = 4;
 
+    // Wrist2 - Not present in this Robot Arm
     servos_info_array[5] = servo_270;
     servos_info_array[5].pwm_number = 5;
 
-    servos_info_array[6] = servo_270;
-    servos_info_array[6].pwm_number = 6;
+    // Gripper
+    servos_info_array[GRIPPER_MOTOR_INDEX] = servo_270;
+    servos_info_array[GRIPPER_MOTOR_INDEX].pwm_number = 6;
+    //servos_info_array[GRIPPER_MOTOR_INDEX].bottom_degrees_limit = 45;
+    //servos_info_array[GRIPPER_MOTOR_INDEX].top_degrees_limit = 225;
 
+    // Not present in this Robot Arm
     servos_info_array[7] = servo_270;
     servos_info_array[7].pwm_number = 7;
     
     set_servo_position_in_degrees(0, servos_info_array[0].degrees/2); // base
     set_servo_position_in_degrees(1, servos_info_array[1].degrees/2); // shoulder
     set_servo_position_in_degrees(2, servos_info_array[2].degrees/2); // elbow
-    set_servo_position_in_degrees(3, servos_info_array[3].degrees/2); // arm0
-    set_servo_position_in_degrees(4, servos_info_array[4].degrees/2); // wrist2
-    // set_servo_position_in_degrees(5, servos[5].degrees/2); // wrist3 - Not present in this Robot Arm
+    set_servo_position_in_degrees(3, servos_info_array[3].degrees/2); // arm
+    set_servo_position_in_degrees(4, servos_info_array[4].degrees/2); // wrist
+    // set_servo_position_in_degrees(5, servos[5].degrees/2); // wrist2 - Not present in this Robot Arm
     set_servo_position_in_degrees(6, servos_info_array[6].degrees/2); // gripper
     // set_servo_position_in_degrees(7, servos[7].degrees/2); // - Not present in this Robot Arm
     
@@ -189,12 +312,26 @@ void set_servo_position_in_degrees(uint8_t servo, float degrees)
     {
         degrees = (float)servos_info_array[servo].degrees;
     }
-    else if (degrees < 0.0f)
+    else if (degrees <= 0.0f)
     {
         degrees = 0.0f; // If we try to set a negative degrees, we will set 0 degrees.
     }
 
-    float pulse_width = servos_info_array[servo].center_us + (servos_info_array[servo].degree_to_us * degrees);
+    // Since we are using absolute position in degrees, we are getting the left position in microseconds.
+    float pulse_width = servos_info_array[servo].left_us +
+                        (servos_info_array[servo].degree_to_us * degrees);
+    if (pulse_width > servos_info_array[servo].right_us)
+    {
+        // If we try to set a bigger than allowed pulse width, we will set the maximum allowed pulse width.
+        pulse_width = servos_info_array[servo].right_us;
+    }
+
+    if (pulse_width < servos_info_array[servo].left_us)
+    {
+        // If we try to set a smaller than allowed pulse width, we will set the minimum allowed pulse width.
+        pulse_width = servos_info_array[servo].left_us;
+    }
+
     servos_info_array[servo].current_degrees = (uint16_t)degrees;
 
     set_pwm_pulse_width_us(servos_info_array[servo].pwm_number, (uint16_t)pulse_width);
@@ -230,3 +367,15 @@ void set_gripper_servo_speed(motor_speed_t speed)
     servo_motor_speeds_array[GRIPPER_MOTOR_INDEX] = speed;
 }
 
+bool set_servo_motor_speed(uint8_t servo, motor_speed_t speed)
+{
+    if (servo >= SERVOS_COUNT)
+    {
+        printf("Error: Invalid servo index %d. Must be between 0 and %d.\n", servo, SERVOS_COUNT - 1);
+        return false;
+    }
+
+    servo_motor_speeds_array[servo] = speed;
+
+    return true;
+}
