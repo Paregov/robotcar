@@ -1,6 +1,6 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
-namespace Paregov.RobotCar.Rest.Service.SoftwareUpdaters
+namespace Paregov.RobotCar.Rest.Service.SoftwareUpdate
 {
     /// <summary>
     /// Defines the communication interface types available for firmware updates.

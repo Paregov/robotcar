@@ -1,4 +1,4 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
 using System;
 using System.IO;
@@ -8,7 +8,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Paregov.RobotCar.Rest.Service.Models;
-using Paregov.RobotCar.Rest.Service.SoftwareUpdaters;
+using Paregov.RobotCar.Rest.Service.SoftwareUpdate;
 
 namespace Paregov.RobotCar.Rest.Service.Controllers;
 
@@ -42,7 +42,7 @@ public class SoftwareController : ControllerBase
         await Request.Body.CopyToAsync(memoryStream, cancellationToken);
 
         // Convert the memory stream to a byte array.
-        byte[] firmware = memoryStream.ToArray();
+        var firmware = memoryStream.ToArray();
 
         if (firmware.Length == 0 || firmware.Length != contentLength)
         {
@@ -51,8 +51,8 @@ public class SoftwareController : ControllerBase
         }
 
         // Parse the interface parameter, default to UART if not specified or invalid
-        FirmwareUpdateInterface selectedInterface = ParseUpdateInterface(updateInterface);
-        
+        var selectedInterface = ParseUpdateInterface(updateInterface);
+
         _logger.LogInformation($"Firmware update requested using {selectedInterface} interface.");
 
         var result = _firmwareUploader.UpdateLowLevelController(firmware, selectedInterface);
@@ -76,7 +76,7 @@ public class SoftwareController : ControllerBase
         await Request.Body.CopyToAsync(memoryStream, cancellationToken);
 
         // Convert the memory stream to a byte array.
-        byte[] restServer = memoryStream.ToArray();
+        var restServer = memoryStream.ToArray();
 
         if (restServer.Length == 0 || restServer.Length != contentLength)
         {

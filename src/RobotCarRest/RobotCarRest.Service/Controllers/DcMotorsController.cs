@@ -1,4 +1,4 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +12,8 @@ public class DcMotorsController : ControllerBase
 {
     private readonly ILogger<ServosController> _logger;
 
-    public DcMotorsController(ILogger<ServosController> logger)
+    public DcMotorsController(
+        ILogger<ServosController> logger)
     {
         _logger = logger;
     }

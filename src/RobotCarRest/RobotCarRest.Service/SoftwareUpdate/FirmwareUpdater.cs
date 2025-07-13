@@ -8,18 +8,18 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Paregov.RobotCar.Rest.Service.Hardware;
 
-namespace Paregov.RobotCar.Rest.Service.SoftwareUpdaters;
+namespace Paregov.RobotCar.Rest.Service.SoftwareUpdate;
 
 public class FirmwareUpdater : IFirmwareUpdater
 {
     private readonly ILogger<FirmwareUpdater> _logger;
     private readonly IHardwareControl _hardwareControl;
 
-    private const string SerialPort = "/dev/serial0";
+    private const string s_serialPort = "/dev/serial0";
     private readonly string _firmwarePath;
 
-    private const int BOOT_ENABLE_PIN = 23;
-    private const int RUN_CTRL_PIN = 24;
+    private static readonly int BOOT_ENABLE_PIN = 23;
+    private static readonly int RUN_CTRL_PIN = 24;
 
     public FirmwareUpdater(
         ILogger<FirmwareUpdater> logger,
@@ -31,13 +31,9 @@ public class FirmwareUpdater : IFirmwareUpdater
         _firmwarePath = Path.Join(AppContext.BaseDirectory, "firmware/LowLevelController.bin");
     }
 
-    public bool UpdateLowLevelController(byte[]? firmwareData)
-    {
-        // Default to UART interface for backward compatibility
-        return UpdateLowLevelController(firmwareData, FirmwareUpdateInterface.Uart);
-    }
-
-    public bool UpdateLowLevelController(byte[]? firmwareData, FirmwareUpdateInterface updateInterface)
+    public bool UpdateLowLevelController(
+        byte[]? firmwareData,
+        FirmwareUpdateInterface updateInterface = FirmwareUpdateInterface.Uart)
     {
         if (WriteFirmwareToFile(firmwareData))
         {
@@ -60,11 +56,11 @@ public class FirmwareUpdater : IFirmwareUpdater
         _logger.LogError("Failed to write firmware data to file. Update process aborted.");
         return false;
     }
-    
+
     private bool RunUpdateProcess(FirmwareUpdateInterface updateInterface = FirmwareUpdateInterface.Uart)
     {
         var _gpioController = new GpioController();
-        
+
         _gpioController.OpenPin(BOOT_ENABLE_PIN, PinMode.Output);
         _gpioController.OpenPin(RUN_CTRL_PIN, PinMode.Output);
 
@@ -91,7 +87,7 @@ public class FirmwareUpdater : IFirmwareUpdater
 
         _logger.LogInformation("Set the boot enable pin to HIGH (normal operation mode).");
         _gpioController.Write(BOOT_ENABLE_PIN, PinValue.High);
-        
+
         // Dispose the GpioController when done to release resources
         _gpioController.Dispose();
         _logger.LogInformation("GPIO pins released.");
@@ -127,7 +123,7 @@ public class FirmwareUpdater : IFirmwareUpdater
         _logger.LogInformation("\nStarting UART firmware update...");
 
         // Construct the arguments string
-        string arguments = $"-f \"{_firmwarePath}\" -p \"{SerialPort}\" -a";
+        var arguments = $"-f \"{_firmwarePath}\" -p \"{s_serialPort}\" -a";
 
         return ExecutePicoboot3(arguments);
     }
@@ -140,7 +136,7 @@ public class FirmwareUpdater : IFirmwareUpdater
         _logger.LogInformation("\nStarting SPI firmware update...");
 
         // Construct the arguments string
-        string arguments = $"-i spi -f \"{_firmwarePath}\" --bus 0 --device 0 --baud 10000000 -a";
+        var arguments = $"-i spi -f \"{_firmwarePath}\" --bus 0 --device 0 --baud 10000000 -a";
 
         return ExecutePicoboot3(arguments);
     }
@@ -170,8 +166,8 @@ public class FirmwareUpdater : IFirmwareUpdater
             process.Start();
 
             // Read the output and errors
-            string stdout = process.StandardOutput.ReadToEnd();
-            string stderr = process.StandardError.ReadToEnd();
+            var stdout = process.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
 
             process.WaitForExit(); // Wait for the process to complete
 

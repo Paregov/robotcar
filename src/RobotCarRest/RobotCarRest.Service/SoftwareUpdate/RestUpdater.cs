@@ -6,12 +6,12 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using NetworkController.ZipUtilities;
 
-namespace Paregov.RobotCar.Rest.Service.SoftwareUpdaters
+namespace Paregov.RobotCar.Rest.Service.SoftwareUpdate
 {
     public class RestUpdater : IRestUpdater
     {
         private readonly string _baseFolder;
-        private const string ZipFileName = "restserver.zip";
+        private const string s_zipFileName = "restserver.zip";
         private readonly ILogger<RestUpdater> _logger;
         private readonly IUnzipUtility _unzipUtility;
 
@@ -38,15 +38,15 @@ namespace Paregov.RobotCar.Rest.Service.SoftwareUpdaters
                 _logger.LogError("Received empty archive for REST software update.");
                 return false;
             }
-            
+
             var nextVersion = GetNextBuildVersion(_baseFolder);
             var targetDirectory = Path.Combine(_baseFolder, nextVersion);
 
             Directory.CreateDirectory(targetDirectory);
 
-            File.WriteAllBytes(Path.Combine(targetDirectory, ZipFileName), archive);
+            File.WriteAllBytes(Path.Combine(targetDirectory, s_zipFileName), archive);
 
-            var zipFilePath = Path.Combine(targetDirectory, ZipFileName);
+            var zipFilePath = Path.Combine(targetDirectory, s_zipFileName);
             var result = _unzipUtility.UnzipToCurrentFolder(zipFilePath);
 
             _logger.LogInformation($"Successfully installed REST software to version {nextVersion}.");
@@ -61,12 +61,12 @@ namespace Paregov.RobotCar.Rest.Service.SoftwareUpdaters
                 throw new DirectoryNotFoundException(
                     $"The specified base folder does not exist: {baseFolderPath}");
             }
-            
-            var subdirectoryPaths = Directory.GetDirectories(
+
+            var subDirectoryPaths = Directory.GetDirectories(
                 baseFolderPath, "*", SearchOption.TopDirectoryOnly);
 
             // Use LINQ to process the directory names.
-            var latestVersion = subdirectoryPaths
+            var latestVersion = subDirectoryPaths
                 .Select(Path.GetFileName)
                 .Select(name =>
                 {
@@ -75,13 +75,13 @@ namespace Paregov.RobotCar.Rest.Service.SoftwareUpdaters
                 })
                 .Where(version => version != null)
                 .MaxBy(v => v);
-            
+
             if (latestVersion != null)
             {
-                int major = latestVersion.Major;
-                int minor = latestVersion.Minor;
-                int build = Math.Max(0, latestVersion.Build);
-                int revision = Math.Max(0, latestVersion.Revision) + 1;
+                var major = latestVersion.Major;
+                var minor = latestVersion.Minor;
+                var build = Math.Max(0, latestVersion.Build);
+                var revision = Math.Max(0, latestVersion.Revision) + 1;
 
                 return new Version(major, minor, build, revision).ToString();
             }

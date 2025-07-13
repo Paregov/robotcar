@@ -1,4 +1,4 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
 using System;
 using Asp.Versioning;
@@ -13,7 +13,7 @@ using Paregov.RobotCar.Rest.Service.Hardware;
 using Paregov.RobotCar.Rest.Service.Hardware.Communication;
 using Paregov.RobotCar.Rest.Service.Hardware.SPI;
 using Paregov.RobotCar.Rest.Service.Servos;
-using Paregov.RobotCar.Rest.Service.SoftwareUpdaters;
+using Paregov.RobotCar.Rest.Service.SoftwareUpdate;
 using Serilog;
 
 namespace Paregov.RobotCar.Rest.Service

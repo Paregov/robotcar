@@ -1,0 +1,41 @@
+<Project>
+  <PropertyGroup>
+    <!-- General project settings -->
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors />
+    
+    <!-- Enable code analysis -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    
+    <!-- Code style enforcement -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    
+    <!-- MSBuild settings for better build performance -->
+    <ReportAnalyzer>true</ReportAnalyzer>
+    
+    <!-- Suppress specific analyzer warnings for the entire solution -->
+    <NoWarn>$(NoWarn);CA1848</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- C# Code Style - var preferences -->
+    <!-- These settings work with EditorConfig to prefer var over explicit types -->
+    <CodeAnalysisRuleSet></CodeAnalysisRuleSet>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Global analyzer packages can be added here if needed -->
+    <!-- <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" /> -->
+  </ItemGroup>
+
+  <!-- Enable EditorConfig support for all projects -->
+  <PropertyGroup>
+    <UseEditorConfigFiles>true</UseEditorConfigFiles>
+  </PropertyGroup>
+
+</Project>

@@ -5,6 +5,109 @@ Accept: application/json
 
 ###
 
+# Get all servos status
+GET {{NetworkController_HostAddress}}/api/v1.0/servos
+Accept: application/json
+
+###
+
+# Get specific servo position
+GET {{NetworkController_HostAddress}}/api/v1.0/servos/0/position
+Accept: application/json
+
+###
+
+# Set servo position with full control parameters
+PUT {{NetworkController_HostAddress}}/api/v1.0/servos/0/position
+Content-Type: application/json
+
+{
+  "servoId": 0,
+  "positionDegrees": 45.0,
+  "accelerationDegreesPerSecSquared": 200.0,
+  "velocityDegreesPerSecond": 100.0,
+  "timeoutMs": 3000
+}
+
+###
+
+# Set servo position with default parameters
+PUT {{NetworkController_HostAddress}}/api/v1.0/servos/1/position
+Content-Type: application/json
+
+{
+  "servoId": 1,
+  "positionDegrees": -30.0
+}
+
+###
+
+# Set multiple servo positions simultaneously (using List in JSON)
+PUT {{NetworkController_HostAddress}}/api/v1.0/servos/positions
+Content-Type: application/json
+
+{
+  "servoCommands": [
+    {
+      "servoId": 0,
+      "positionDegrees": 90.0,
+      "accelerationDegreesPerSecSquared": 150.0,
+      "velocityDegreesPerSecond": 75.0,
+      "timeoutMs": 2000
+    },
+    {
+      "servoId": 1,
+      "positionDegrees": -45.0,
+      "accelerationDegreesPerSecSquared": 100.0,
+      "velocityDegreesPerSecond": 50.0,
+      "timeoutMs": 2500
+    },
+    {
+      "servoId": 2,
+      "positionDegrees": 0.0,
+      "accelerationDegreesPerSecSquared": 200.0,
+      "velocityDegreesPerSecond": 80.0,
+      "timeoutMs": 1500
+    }
+  ],
+  "executeSimultaneously": true
+}
+
+###
+
+# Set multiple servo positions sequentially (using List in JSON)
+PUT {{NetworkController_HostAddress}}/api/v1.0/servos/positions
+Content-Type: application/json
+
+{
+  "servoCommands": [
+    {
+      "servoId": 0,
+      "positionDegrees": 0.0
+    },
+    {
+      "servoId": 1,
+      "positionDegrees": 0.0
+    },
+    {
+      "servoId": 2,
+      "positionDegrees": 45.0,
+      "accelerationDegreesPerSecSquared": 300.0,
+      "velocityDegreesPerSecond": 120.0,
+      "timeoutMs": 4000
+    }
+  ],
+  "executeSimultaneously": false
+}
+
+###
+
+# Center all servos
+PUT {{NetworkController_HostAddress}}/api/v1.0/servos/center
+Content-Type: application/json
+
+###
+
 # Firmware Update with UART interface (default)
 POST {{NetworkController_HostAddress}}/api/v1.0/software/firmware/
 Content-Type: application/octet-stream

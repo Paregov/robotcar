@@ -1,4 +1,4 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
 using System;
 using System.Threading;
@@ -15,15 +15,15 @@ namespace Paregov.RobotCar.Rest.Service.Controllers;
 [ApiController]
 public class RemoteControlController : ControllerBase
 {
-    private const int DataIndexBaseRotation = 0;
-    private const int DataIndexShoulder = 1;
-    private const int DataIndexElbow = 2;
-    private const int DataIndexArm = 3;
-    private const int DataIndexWrist = 4;
-    private const int DataIndexGripper = 5;
+    private const int s_dataIndexBaseRotation = 0;
+    private const int s_dataIndexShoulder = 1;
+    private const int s_dataIndexElbow = 2;
+    private const int s_dataIndexArm = 3;
+    private const int s_dataIndexWrist = 4;
+    private const int s_dataIndexGripper = 5;
 
-    private const int DataIndexForwardReverse = 6;
-    private const int DataIndexLeftRight = 7;
+    private const int s_dataIndexForwardReverse = 6;
+    private const int s_dataIndexLeftRight = 7;
 
     private readonly ILogger<RemoteControlController> _logger;
     private readonly IHardwareControl _hardwareControl;
@@ -63,15 +63,15 @@ public class RemoteControlController : ControllerBase
         // 7 - DC motors left/right direction.
 
         // We are going to use the values for velocity. 0-127 is reverse, 128-255 is forward.
-        var dcMotorSpeed = joysticksRequest.Joysticks[DataIndexForwardReverse];
-        var dcMotorDirection = joysticksRequest.Joysticks[DataIndexLeftRight];
+        var dcMotorSpeed = joysticksRequest.Joysticks[s_dataIndexForwardReverse];
+        var dcMotorDirection = joysticksRequest.Joysticks[s_dataIndexLeftRight];
 
-        var baseRotation = joysticksRequest.Joysticks[DataIndexBaseRotation];
-        var shoulder = joysticksRequest.Joysticks[DataIndexShoulder];
-        var elbow = joysticksRequest.Joysticks[DataIndexElbow];
-        var arm = joysticksRequest.Joysticks[DataIndexArm];
-        var wrist = joysticksRequest.Joysticks[DataIndexWrist];
-        var gripper = joysticksRequest.Joysticks[DataIndexGripper];
+        var baseRotation = joysticksRequest.Joysticks[s_dataIndexBaseRotation];
+        var shoulder = joysticksRequest.Joysticks[s_dataIndexShoulder];
+        var elbow = joysticksRequest.Joysticks[s_dataIndexElbow];
+        var arm = joysticksRequest.Joysticks[s_dataIndexArm];
+        var wrist = joysticksRequest.Joysticks[s_dataIndexWrist];
+        var gripper = joysticksRequest.Joysticks[s_dataIndexGripper];
 
         _logger.LogInformation("Received joystick readings: {Readings}", joysticksRequest.Joysticks);
 

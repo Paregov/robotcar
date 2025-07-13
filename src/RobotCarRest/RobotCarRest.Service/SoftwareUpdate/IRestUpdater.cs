@@ -1,6 +1,6 @@
 ﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
-namespace Paregov.RobotCar.Rest.Service.SoftwareUpdaters
+namespace Paregov.RobotCar.Rest.Service.SoftwareUpdate
 {
     public interface IRestUpdater
     {
