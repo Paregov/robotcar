@@ -10,6 +10,8 @@ using Microsoft.OpenApi.Models;
 using NetworkController.ZipUtilities;
 using Paregov.RobotCar.Rest.Service.BusinessLogic;
 using Paregov.RobotCar.Rest.Service.Hardware;
+using Paregov.RobotCar.Rest.Service.Hardware.Communication;
+using Paregov.RobotCar.Rest.Service.Hardware.SPI;
 using Paregov.RobotCar.Rest.Service.Servos;
 using Paregov.RobotCar.Rest.Service.SoftwareUpdaters;
 using Serilog;
@@ -73,7 +75,8 @@ namespace Paregov.RobotCar.Rest.Service
 
             builder.Services.AddSingleton<IServos, Servos.Servos>();
             builder.Services.AddSingleton<IUnzipUtility, UnzipUtility>();
-            builder.Services.AddSingleton<ISpiCommunicator, SpiCommunicator>();
+            builder.Services.AddSingleton<IHardwareCommunication, SpiCommunication>();
+            builder.Services.AddSingleton<UartCommunication>();
             builder.Services.AddSingleton<IHardwareControl, HardwareControl>();
             builder.Services.AddSingleton<IFirmwareUpdater, FirmwareUpdater>();
             builder.Services.AddSingleton<IRestUpdater, RestUpdater>();

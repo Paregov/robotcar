@@ -1,0 +1,264 @@
+// Copyright © Svetoslav Paregov. All rights reserved.
+
+using System;
+using System.IO.Ports;
+using System.Text;
+using Microsoft.Extensions.Logging;
+using Paregov.RobotCar.Rest.Service.Hardware.Communication.Configuration;
+
+namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
+{
+    /// <summary>
+    /// Manages UART communication using SerialPort for sending strings and bytes
+    /// with proper configuration and error handling.
+    /// </summary>
+    public class UartCommunication : IHardwareCommunication
+    {
+        private readonly ILogger<UartCommunication> _logger;
+        private readonly object _lock = new();
+        
+        private SerialPort? _serialPort;
+        private UartConfig? _config;
+
+        /// <summary>
+        /// Initializes a new instance of the UartCommunication class.
+        /// </summary>
+        /// <param name="logger">Logger instance</param>
+        public UartCommunication(ILogger<UartCommunication> logger)
+        {
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Gets whether the communication channel is currently initialized and ready for use.
+        /// </summary>
+        public bool IsChannelReady => _serialPort?.IsOpen ?? false;
+
+        /// <summary>
+        /// Initializes the UART communication channel with the specified configuration.
+        /// </summary>
+        /// <param name="config">The UART configuration instance</param>
+        /// <returns>True if initialization was successful; otherwise, false</returns>
+        public bool InitializeChannel(CommunicationConfigBase config)
+        {
+            if (config is not UartConfig uartConfig)
+            {
+                _logger.LogError("Invalid configuration type. Expected UartConfig.");
+                return false;
+            }
+
+            if (!uartConfig.IsValid())
+            {
+                _logger.LogError("Invalid UART configuration provided.");
+                return false;
+            }
+
+            try
+            {
+                // Free existing channel if present
+                FreeChannel();
+
+                _config = uartConfig;
+
+                _serialPort = new SerialPort(
+                    _config.PortName,
+                    _config.BaudRate,
+                    _config.Parity,
+                    _config.DataBits,
+                    _config.StopBits)
+                {
+                    Handshake = _config.Handshake,
+                    ReadTimeout = _config.ReadTimeoutMs,
+                    WriteTimeout = _config.WriteTimeoutMs
+                };
+
+                _serialPort.Open();
+                
+                _logger.LogInformation($"UART device initialized successfully. {_config.GetConfigurationSummary()}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to initialize the UART serial port: {Message}", ex.Message);
+                FreeChannel();
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Frees the UART communication channel and releases associated resources.
+        /// </summary>
+        /// <returns>True if the channel was successfully freed; otherwise, false</returns>
+        public bool FreeChannel()
+        {
+            try
+            {
+                _serialPort?.Close();
+                _serialPort?.Dispose();
+                _serialPort = null;
+                _config = null;
+                _logger.LogInformation("UART communication channel freed successfully.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error freeing UART communication channel: {Message}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Sends a string message over UART with protocol framing.
+        /// </summary>
+        /// <param name="message">The string message to send</param>
+        /// <returns>True if the message was sent successfully; otherwise, false</returns>
+        public bool SendMessage(string message)
+        {
+            if (!IsChannelReady)
+            {
+                _logger.LogWarning("Cannot send message. UART serial port is not initialized or open.");
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(message))
+            {
+                _logger.LogWarning("Cannot send an empty message.");
+                return false;
+            }
+
+            try
+            {
+                lock (_lock)
+                {
+                    string messageToSend = _config!.UseFraming 
+                        ? BuildFramedCommand(message) 
+                        : message;
+
+                    if (_config.EnableDebugLogging)
+                    {
+                        _logger.LogDebug("Sending UART message: {Message}", messageToSend);
+                    }
+
+                    _serialPort!.Write(messageToSend);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during UART message transmission: {Message}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Sends raw bytes over UART.
+        /// </summary>
+        /// <param name="message">The byte array to send</param>
+        /// <returns>True if the bytes were sent successfully; otherwise, false</returns>
+        public bool SendBytesMessage(byte[] message)
+        {
+            if (!IsChannelReady)
+            {
+                _logger.LogWarning("Cannot send bytes. UART serial port is not initialized or open.");
+                return false;
+            }
+
+            if (message == null || message.Length == 0)
+            {
+                _logger.LogWarning("Cannot send empty byte array.");
+                return false;
+            }
+
+            try
+            {
+                lock (_lock)
+                {
+                    if (_config!.EnableDebugLogging)
+                    {
+                        _logger.LogDebug($"Sending UART bytes: [{string.Join(", ", message)}]");
+                    }
+
+                    _serialPort!.Write(message, 0, message.Length);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during UART bytes transmission: {Message}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Closes the UART connection.
+        /// </summary>
+        public void Close()
+        {
+            try
+            {
+                _serialPort?.Close();
+                _logger.LogInformation("UART serial port closed.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error closing UART serial port: {Message}", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Opens the UART connection.
+        /// </summary>
+        public void Open()
+        {
+            try
+            {
+                if (_serialPort != null && !_serialPort.IsOpen)
+                {
+                    _serialPort.Open();
+                    _logger.LogInformation("UART serial port opened.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error opening UART serial port: {Message}", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Gets whether the UART connection is open.
+        /// </summary>
+        public bool IsOpen => _serialPort?.IsOpen ?? false;
+
+        /// <summary>
+        /// Builds a framed command with start and end bytes.
+        /// </summary>
+        /// <param name="command">The command string to frame</param>
+        /// <returns>The framed command string</returns>
+        private string BuildFramedCommand(string command)
+        {
+            if (_config?.UseFraming != true)
+                return command;
+
+            var stringBuilder = new StringBuilder();
+            
+            // Convert byte arrays to chars for framing
+            foreach (byte b in _config.StartBytes)
+                stringBuilder.Append((char)b);
+            
+            stringBuilder.Append(command);
+            
+            foreach (byte b in _config.EndBytes)
+                stringBuilder.Append((char)b);
+
+            return stringBuilder.ToString();
+        }
+
+        /// <summary>
+        /// Cleans up the UART resources.
+        /// </summary>
+        public void Dispose()
+        {
+            FreeChannel();
+        }
+    }
+}
