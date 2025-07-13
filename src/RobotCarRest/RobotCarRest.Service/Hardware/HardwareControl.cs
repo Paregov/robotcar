@@ -12,19 +12,16 @@ namespace Paregov.RobotCar.Rest.Service.Hardware
     {
         private readonly ILogger<HardwareControl> _logger;
         private readonly IHardwareCommunication _hardwareCommunication;
-        private readonly UartCommunication _uartCommunication;
 
         private readonly object _lock = new();
         private bool _normalOperationsAllowed;
 
         public HardwareControl(
             ILogger<HardwareControl> logger,
-            IHardwareCommunication hardwareCommunication,
-            UartCommunication uartCommunication)
+            IHardwareCommunication hardwareCommunication)
         {
             _logger = logger;
             _hardwareCommunication = hardwareCommunication;
-            _uartCommunication = uartCommunication;
             _normalOperationsAllowed = true;
         }
 
@@ -129,14 +126,12 @@ namespace Paregov.RobotCar.Rest.Service.Hardware
         public bool PrepareForFirmwareUpdate()
         {
             _normalOperationsAllowed = false;
-            _uartCommunication.Close();
 
             return true;
         }
 
         public bool ResumeAfterFirmwareUpdate()
         {
-            _uartCommunication.Open();
             _normalOperationsAllowed = true;
 
             return true;
@@ -144,7 +139,6 @@ namespace Paregov.RobotCar.Rest.Service.Hardware
 
         public void Dispose()
         {
-            _uartCommunication?.Close();
         }
     }
 }

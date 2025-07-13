@@ -33,13 +33,19 @@ public class FirmwareUpdater : IFirmwareUpdater
 
     public bool UpdateLowLevelController(byte[]? firmwareData)
     {
+        // Default to UART interface for backward compatibility
+        return UpdateLowLevelController(firmwareData, FirmwareUpdateInterface.Uart);
+    }
+
+    public bool UpdateLowLevelController(byte[]? firmwareData, FirmwareUpdateInterface updateInterface)
+    {
         if (WriteFirmwareToFile(firmwareData))
         {
             try
             {
                 _hardwareControl.PrepareForFirmwareUpdate();
 
-                return RunUpdateProcess();
+                return RunUpdateProcess(updateInterface);
             }
             catch (Exception e)
             {
@@ -55,7 +61,7 @@ public class FirmwareUpdater : IFirmwareUpdater
         return false;
     }
     
-    private bool RunUpdateProcess()
+    private bool RunUpdateProcess(FirmwareUpdateInterface updateInterface = FirmwareUpdateInterface.Uart)
     {
         var _gpioController = new GpioController();
         
@@ -64,7 +70,7 @@ public class FirmwareUpdater : IFirmwareUpdater
 
         _logger.LogInformation("GPIO pins initialized.");
 
-        _logger.LogInformation("Starting update_firmware.cs ...");
+        _logger.LogInformation($"Starting firmware update using {updateInterface} interface...");
 
         _logger.LogInformation("Set the boot enable pin to LOW (bootloader mode).");
         _gpioController.Write(BOOT_ENABLE_PIN, PinValue.Low);
@@ -76,22 +82,21 @@ public class FirmwareUpdater : IFirmwareUpdater
         _logger.LogInformation("Start the controller again (set RUN_CTRL_PIN to HIGH).");
         _gpioController.Write(RUN_CTRL_PIN, PinValue.High);
 
-        // var result = UpdateUart();
-        var result = UpdateSpi();
+        bool result = updateInterface switch
+        {
+            FirmwareUpdateInterface.Spi => UpdateSpi(),
+            FirmwareUpdateInterface.Uart => UpdateUart(),
+            _ => UpdateUart() // Default to UART
+        };
 
         _logger.LogInformation("Set the boot enable pin to HIGH (normal operation mode).");
         _gpioController.Write(BOOT_ENABLE_PIN, PinValue.High);
-
-        //_logger.LogInformation("Reset pins to inputs.");
-        // Set pins back to input mode. This releases control of the pins.
-        //_gpioController.SetPinMode(BOOT_ENABLE_PIN, PinMode.Input);
-        //_gpioController.SetPinMode(RUN_CTRL_PIN, PinMode.Input);
-
+        
         // Dispose the GpioController when done to release resources
         _gpioController.Dispose();
         _logger.LogInformation("GPIO pins released.");
 
-        _logger.LogInformation($"Firmware update process completed. Success = {result}.");
+        _logger.LogInformation($"Firmware update process completed using {updateInterface} interface. Success = {result}.");
 
         return result;
     }

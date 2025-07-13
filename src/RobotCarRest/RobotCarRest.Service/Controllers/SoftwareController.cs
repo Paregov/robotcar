@@ -34,6 +34,7 @@ public class SoftwareController : ControllerBase
     [Consumes("application/octet-stream")]
     [HttpPost("api/v{version:apiVersion}/software/firmware/")]
     public async Task<ActionResult<CommandResponse>> UpdateLowLevelControllerFirmwareAsync(
+        [FromQuery] string? updateInterface = null,
         CancellationToken cancellationToken = default)
     {
         var contentLength = Request.ContentLength;
@@ -49,10 +50,15 @@ public class SoftwareController : ControllerBase
             return BadRequest(new CommandResponse { IsSuccess = false });
         }
 
-        var result =_firmwareUploader.UpdateLowLevelController(firmware);
+        // Parse the interface parameter, default to UART if not specified or invalid
+        FirmwareUpdateInterface selectedInterface = ParseUpdateInterface(updateInterface);
+        
+        _logger.LogInformation($"Firmware update requested using {selectedInterface} interface.");
+
+        var result = _firmwareUploader.UpdateLowLevelController(firmware, selectedInterface);
         if (!result)
         {
-            _logger.LogError("Failed to update low level controller firmware.");
+            _logger.LogError($"Failed to update low level controller firmware using {selectedInterface} interface.");
             return StatusCode(500, new CommandResponse { IsSuccess = false });
         }
 
@@ -86,6 +92,29 @@ public class SoftwareController : ControllerBase
 #pragma warning restore CS4014
 
         return Ok(new CommandResponse());
+    }
+
+    /// <summary>
+    /// Parses the update interface string parameter into the corresponding enum value.
+    /// </summary>
+    /// <param name="interfaceString">The interface string from the query parameter</param>
+    /// <returns>The corresponding FirmwareUpdateInterface enum value, defaults to UART</returns>
+    private FirmwareUpdateInterface ParseUpdateInterface(string? interfaceString)
+    {
+        if (string.IsNullOrWhiteSpace(interfaceString))
+        {
+            _logger.LogInformation("No update interface specified, defaulting to UART.");
+            return FirmwareUpdateInterface.Uart;
+        }
+
+        if (Enum.TryParse<FirmwareUpdateInterface>(interfaceString, true, out var parsedInterface))
+        {
+            _logger.LogInformation($"Update interface parsed as: {parsedInterface}");
+            return parsedInterface;
+        }
+
+        _logger.LogWarning($"Invalid update interface '{interfaceString}' specified, defaulting to UART. Valid options are: {string.Join(", ", Enum.GetNames<FirmwareUpdateInterface>())}");
+        return FirmwareUpdateInterface.Uart;
     }
 
     private async Task ExitRestServerAsync()

@@ -1,6 +1,46 @@
-@NetworkController_HostAddress = http://localhost:5178
+@NetworkController_HostAddress = http://localhost:5000
 
 GET {{NetworkController_HostAddress}}/weatherforecast/
 Accept: application/json
+
+###
+
+# Firmware Update with UART interface (default)
+POST {{NetworkController_HostAddress}}/api/v1.0/software/firmware/
+Content-Type: application/octet-stream
+
+< ./path/to/firmware.bin
+
+###
+
+# Firmware Update with UART interface (explicitly specified)
+POST {{NetworkController_HostAddress}}/api/v1.0/software/firmware/?updateInterface=uart
+Content-Type: application/octet-stream
+
+< ./path/to/firmware.bin
+
+###
+
+# Firmware Update with SPI interface
+POST {{NetworkController_HostAddress}}/api/v1.0/software/firmware/?updateInterface=spi
+Content-Type: application/octet-stream
+
+< ./path/to/firmware.bin
+
+###
+
+# Firmware Update with invalid interface (will default to UART)
+POST {{NetworkController_HostAddress}}/api/v1.0/software/firmware/?updateInterface=invalid
+Content-Type: application/octet-stream
+
+< ./path/to/firmware.bin
+
+###
+
+# REST Server Update
+POST {{NetworkController_HostAddress}}/api/v1.0/software/restserver/
+Content-Type: application/octet-stream
+
+< ./path/to/restserver.zip
 
 ###
