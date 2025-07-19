@@ -2,7 +2,7 @@
 
 using System.Collections.Generic;
 
-namespace Paregov.RobotCar.Rest.Service.Servos
+namespace Paregov.RobotCar.Rest.Service.BusinessLogic.Interfaces
 {
     public interface IServos
     {

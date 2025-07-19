@@ -4,7 +4,7 @@ using System.Threading;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Paregov.RobotCar.Rest.Service.BusinessLogic;
+using Paregov.RobotCar.Rest.Service.BusinessLogic.Interfaces;
 using Paregov.RobotCar.Rest.Service.Hardware;
 using Paregov.RobotCar.Rest.Service.Models;
 using Paregov.RobotCar.Rest.Service.Models.LowLevel;

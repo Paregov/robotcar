@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using Paregov.RobotCar.Rest.Service.BusinessLogic.Interfaces;
 using Paregov.RobotCar.Rest.Service.Models.LowLevel;
 
 namespace Paregov.RobotCar.Rest.Service.BusinessLogic;

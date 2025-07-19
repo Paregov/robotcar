@@ -3,11 +3,12 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Paregov.RobotCar.Rest.Service.BusinessLogic.Interfaces;
 using Paregov.RobotCar.Rest.Service.Hardware;
 using Paregov.RobotCar.Rest.Service.Models.Enums;
 using Paregov.RobotCar.Rest.Service.Models.LowLevel;
 
-namespace Paregov.RobotCar.Rest.Service.Servos
+namespace Paregov.RobotCar.Rest.Service.BusinessLogic
 {
     public class Servos : IServos
     {
@@ -59,7 +60,7 @@ namespace Paregov.RobotCar.Rest.Service.Servos
             }
 
             var positionCommand = new PositionAndSpeedServoCommand(
-                (Int16)positionDegrees,
+                (short)positionDegrees,
                 50  // Hardcoded acceleration for now
                 );
 
