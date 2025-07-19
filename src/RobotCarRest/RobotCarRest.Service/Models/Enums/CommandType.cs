@@ -1,13 +1,13 @@
 ﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
-namespace NetworkController.Models.Enums
+namespace Paregov.RobotCar.Rest.Service.Models.Enums
 {
     public enum CommandType
     {
         InvalidCommand = 0,
-        BaseMotorCommand = 1,
-        ShoulderMotorCommand = 2,
-        ElbowMotorCommand = 3,
+        BaseMotorDirectionCommand = 1,
+        ShoulderMotorDirectionCommand = 2,
+        ElbowMotorDirectionCommand = 3,
         ArmMotorCommand = 4,
         WristMotorCommand = 5,
         Wrist2MotorCommand = 6,
@@ -17,5 +17,11 @@ namespace NetworkController.Models.Enums
         LeftRearMotorCommand = 10,
         RightRearMotorCommand = 11,
         StopAllMotorsCommand = 12,
+        BaseMotorPositionCommand = 13,
+        ShoulderMotorPositionCommand = 14,
+        ElbowMotorPositionCommand = 15,
+        ArmMotorPositionCommand = 16,
+        WristMotorPositionCommand = 17,
+        GripperMotorPositionCommand = 18,
     }
 }

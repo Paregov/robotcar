@@ -1,11 +1,12 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
 using System;
 using System.Device.I2c;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using Paregov.RobotCar.Rest.Service.Hardware.Communication.Configuration;
+using Microsoft.Extensions.Options;
+using Paregov.RobotCar.Rest.Service.Hardware.Communication.Config;
 
 namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 {
@@ -13,27 +14,38 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
     /// Manages I2C communication for sending strings and bytes
     /// with proper configuration and error handling.
     /// </summary>
-    public class I2cCommunication : IHardwareCommunication
+    public class I2CCommunication : IHardwareCommunication
     {
-        private readonly ILogger<I2cCommunication> _logger;
+        private readonly ILogger<I2CCommunication> _logger;
+        private readonly IOptions<I2cOptions> _options;
         private readonly object _lock = new();
-        
-        private I2cDevice? _i2cDevice;
+        private I2cDevice? _i2CDevice;
         private I2cConfig? _config;
 
         /// <summary>
         /// Initializes a new instance of the I2cCommunication class.
         /// </summary>
         /// <param name="logger">Logger instance</param>
-        public I2cCommunication(ILogger<I2cCommunication> logger)
+        /// <param name="options">I2C configuration options</param>
+        public I2CCommunication(
+            ILogger<I2CCommunication> logger,
+            IOptions<I2cOptions> options)
         {
             _logger = logger;
+            _options = options;
+            
+            // Auto-initialize with the provided configuration
+            var config = _options.Value.ToI2cConfig();
+            if (!InitializeChannel(config))
+            {
+                _logger.LogWarning("Failed to auto-initialize I2C communication channel during construction");
+            }
         }
 
         /// <summary>
         /// Gets whether the communication channel is currently initialized and ready for use.
         /// </summary>
-        public bool IsChannelReady => _i2cDevice != null && _config != null;
+        public bool IsChannelReady => _i2CDevice != null && _config != null;
 
         /// <summary>
         /// Initializes the I2C communication channel with the specified configuration.
@@ -63,7 +75,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 
                 I2cConnectionSettings connectionSettings = new(_config.BusId, _config.DeviceAddress);
 
-                _i2cDevice = I2cDevice.Create(connectionSettings);
+                _i2CDevice = I2cDevice.Create(connectionSettings);
 
                 // Validate device address if requested
                 if (_config.ValidateAddress)
@@ -71,7 +83,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
                     ValidateDeviceAddress();
                 }
 
-                _logger.LogInformation($"I2C device initialized successfully. {_config.GetConfigurationSummary()}");
+                _logger.LogInformation("I2C device initialized successfully. {Config}", _config.GetConfigurationSummary());
                 return true;
             }
             catch (Exception ex)
@@ -83,6 +95,21 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
         }
 
         /// <summary>
+        /// Re-initializes the I2C communication channel with a custom device address override.
+        /// </summary>
+        /// <param name="deviceAddressOverride">Override device address</param>
+        /// <returns>True if initialization was successful; otherwise, false</returns>
+        public bool ReinitializeWithDeviceAddress(int deviceAddressOverride)
+        {
+            _logger.LogInformation("Re-initializing I2C with device address override: 0x{DeviceAddress:X2}", deviceAddressOverride);
+            
+            var config = _options.Value.ToI2cConfig();
+            config.DeviceAddress = deviceAddressOverride;
+            
+            return InitializeChannel(config);
+        }
+
+        /// <summary>
         /// Frees the I2C communication channel and releases associated resources.
         /// </summary>
         /// <returns>True if the channel was successfully freed; otherwise, false</returns>
@@ -90,8 +117,8 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
         {
             try
             {
-                _i2cDevice?.Dispose();
-                _i2cDevice = null;
+                _i2CDevice?.Dispose();
+                _i2CDevice = null;
                 _config = null;
                 _logger.LogInformation("I2C communication channel freed successfully.");
                 return true;
@@ -125,10 +152,10 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
             try
             {
                 byte[] messageBytes = Encoding.UTF8.GetBytes(message);
-                
+
                 if (messageBytes.Length > _config!.MaxWriteLength)
                 {
-                    _logger.LogError($"Message too long. Maximum length is {_config.MaxWriteLength} bytes, but message is {messageBytes.Length} bytes.");
+                    _logger.LogError("Message too long. Maximum length is {MaxLength} bytes, but message is {MessageLength} bytes.", _config.MaxWriteLength, messageBytes.Length);
                     return false;
                 }
 
@@ -139,7 +166,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
                         _logger.LogDebug("Sending I2C message: {Message}", message);
                     }
 
-                    _i2cDevice!.Write(messageBytes);
+                    _i2CDevice!.Write(messageBytes);
 
                     if (_config.OperationDelayMs > 0)
                     {
@@ -177,7 +204,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 
             if (message.Length > _config!.MaxWriteLength)
             {
-                _logger.LogError($"Message too long. Maximum length is {_config.MaxWriteLength} bytes, but message is {message.Length} bytes.");
+                _logger.LogError("Message too long. Maximum length is {MaxLength} bytes, but message is {MessageLength} bytes.", _config.MaxWriteLength, message.Length);
                 return false;
             }
 
@@ -187,10 +214,10 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
                 {
                     if (_config.EnableDebugLogging)
                     {
-                        _logger.LogDebug($"Sending I2C bytes: [{string.Join(", ", message)}]");
+                        _logger.LogDebug("Sending I2C bytes: [{Bytes}]", string.Join(", ", message));
                     }
 
-                    _i2cDevice!.Write(message);
+                    _i2CDevice!.Write(message);
 
                     if (_config.OperationDelayMs > 0)
                     {
@@ -232,7 +259,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
                 lock (_lock)
                 {
                     byte[] writeBuffer = new byte[_config!.RegisterAddressLength + data.Length];
-                    
+
                     // Add register address bytes
                     if (_config.RegisterAddressLength == 1)
                     {
@@ -249,10 +276,10 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 
                     if (_config.EnableDebugLogging)
                     {
-                        _logger.LogDebug($"Writing to I2C register 0x{registerAddress:X2}: [{string.Join(", ", data)}]");
+                        _logger.LogDebug("Writing to I2C register 0x{RegisterAddress:X2}: [{Data}]", registerAddress, string.Join(", ", data));
                     }
 
-                    _i2cDevice!.Write(writeBuffer);
+                    _i2CDevice!.Write(writeBuffer);
 
                     if (_config.OperationDelayMs > 0)
                     {
@@ -285,7 +312,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 
             if (length <= 0 || length > _config!.MaxReadLength)
             {
-                _logger.LogWarning($"Invalid read length. Must be between 1 and {_config.MaxReadLength}.");
+                _logger.LogWarning("Invalid read length. Must be between 1 and {MaxLength}.", _config.MaxReadLength);
                 return null;
             }
 
@@ -294,7 +321,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
                 lock (_lock)
                 {
                     byte[] registerAddressBytes = new byte[_config.RegisterAddressLength];
-                    
+
                     if (_config.RegisterAddressLength == 1)
                     {
                         registerAddressBytes[0] = (byte)registerAddress;
@@ -309,18 +336,18 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 
                     if (_config.UseRepeatedStart)
                     {
-                        _i2cDevice!.WriteRead(registerAddressBytes, readBuffer);
+                        _i2CDevice!.WriteRead(registerAddressBytes, readBuffer);
                     }
                     else
                     {
-                        _i2cDevice!.Write(registerAddressBytes);
+                        _i2CDevice!.Write(registerAddressBytes);
                         Thread.Sleep(_config.OperationDelayMs);
-                        _i2cDevice.Read(readBuffer);
+                        _i2CDevice.Read(readBuffer);
                     }
 
                     if (_config.EnableDebugLogging)
                     {
-                        _logger.LogDebug($"Read from I2C register 0x{registerAddress:X2}: [{string.Join(", ", readBuffer)}]");
+                        _logger.LogDebug("Read from I2C register 0x{RegisterAddress:X2}: [{Data}]", registerAddress, string.Join(", ", readBuffer));
                     }
 
                     return readBuffer;
@@ -339,12 +366,12 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
             {
                 // Try to read a single byte to validate the device address
                 byte[] testBuffer = new byte[1];
-                _i2cDevice!.Read(testBuffer);
-                _logger.LogInformation($"I2C device address 0x{_config!.DeviceAddress:X2} validated successfully.");
+                _i2CDevice!.Read(testBuffer);
+                _logger.LogInformation("I2C device address 0x{DeviceAddress:X2} validated successfully.", _config!.DeviceAddress);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"I2C device address 0x{_config!.DeviceAddress:X2} validation failed: {ex.Message}");
+                _logger.LogWarning("I2C device address 0x{DeviceAddress:X2} validation failed: {Message}", _config!.DeviceAddress, ex.Message);
                 throw;
             }
         }
@@ -359,20 +386,20 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
                 try
                 {
                     Thread.Sleep(_config.RetryDelayMs);
-                    
+
                     if (operation())
                     {
-                        _logger.LogInformation($"I2C operation succeeded on retry attempt {attempt}.");
+                        _logger.LogInformation("I2C operation succeeded on retry attempt {Attempt}.", attempt);
                         return true;
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, $"I2C retry attempt {attempt} failed: {ex.Message}");
+                    _logger.LogWarning(ex, "I2C retry attempt {Attempt} failed: {Message}", attempt, ex.Message);
                 }
             }
 
-            _logger.LogError($"I2C operation failed after {_config.MaxRetryAttempts} retry attempts.");
+            _logger.LogError("I2C operation failed after {MaxAttempts} retry attempts.", _config.MaxRetryAttempts);
             return false;
         }
 

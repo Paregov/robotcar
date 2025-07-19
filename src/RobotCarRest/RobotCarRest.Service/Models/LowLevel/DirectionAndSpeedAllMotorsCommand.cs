@@ -5,38 +5,38 @@ using System.Text.Json.Serialization;
 
 namespace Paregov.RobotCar.Rest.Service.Models.LowLevel
 {
-    public class LowLevelCommand
+    public class DirectionAndSpeedAllMotorsCommand
     {
         [JsonPropertyName("lw")]
-        public SingleMotorCommand LeftWheel { get; set; } = new();
+        public DirectionAndSpeedMotorCommand LeftWheel { get; set; } = new();
 
         [JsonPropertyName("rw")]
-        public SingleMotorCommand RightWheel { get; set; } = new();
+        public DirectionAndSpeedMotorCommand RightWheel { get; set; } = new();
 
         [JsonPropertyName("smb")]
-        public SingleMotorCommand Base { get; set; } = new();
+        public DirectionAndSpeedMotorCommand Base { get; set; } = new();
 
         [JsonPropertyName("sms")]
-        public SingleMotorCommand Shoulder { get; set; } = new();
+        public DirectionAndSpeedMotorCommand Shoulder { get; set; } = new();
 
         [JsonPropertyName("sme")]
-        public SingleMotorCommand Elbow { get; set; } = new();
+        public DirectionAndSpeedMotorCommand Elbow { get; set; } = new();
 
         [JsonPropertyName("sma")]
-        public SingleMotorCommand Arm { get; set; } = new();
+        public DirectionAndSpeedMotorCommand Arm { get; set; } = new();
 
         [JsonPropertyName("smw")]
-        public SingleMotorCommand Wrist { get; set; } = new();
+        public DirectionAndSpeedMotorCommand Wrist { get; set; } = new();
 
         [JsonPropertyName("smg")]
-        public SingleMotorCommand Gripper { get; set; } = new();
+        public DirectionAndSpeedMotorCommand Gripper { get; set; } = new();
     }
 
-    public class SingleMotorCommand
+    public class DirectionAndSpeedMotorCommand
     {
-        public static SingleMotorCommand FromReading(int reading)
+        public static DirectionAndSpeedMotorCommand FromReading(int reading)
         {
-            var command = new SingleMotorCommand();
+            var command = new DirectionAndSpeedMotorCommand();
             // Treat small readings as zero to avoid jitter.
             reading = reading is > 117 and < 138 ? 127 : reading;
 

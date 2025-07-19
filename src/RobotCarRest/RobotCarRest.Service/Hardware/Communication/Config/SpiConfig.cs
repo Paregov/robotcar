@@ -1,8 +1,8 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
 using System.Device.Spi;
 
-namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Configuration
+namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Config
 {
     /// <summary>
     /// Configuration class for SPI communication parameters.

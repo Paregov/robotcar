@@ -1,7 +1,7 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
 using System;
-using Paregov.RobotCar.Rest.Service.Hardware.Communication.Configuration;
+using Paregov.RobotCar.Rest.Service.Hardware.Communication.Config;
 
 namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 {

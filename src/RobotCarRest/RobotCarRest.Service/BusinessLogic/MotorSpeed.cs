@@ -5,7 +5,7 @@ namespace Paregov.RobotCar.Rest.Service.BusinessLogic;
 
 public class MotorSpeed : IMotorSpeed
 {
-    public (SingleMotorCommand left, SingleMotorCommand right) GetDcMotorSpeeds(int xValue, int yValue)
+    public (DirectionAndSpeedMotorCommand left, DirectionAndSpeedMotorCommand right) GetDcMotorSpeeds(int xValue, int yValue)
     {
         // Convert the 0-255 joystick readings to a -127 to 128 range.
         int xMapped = xValue - 128;
@@ -34,13 +34,13 @@ public class MotorSpeed : IMotorSpeed
         int leftMotorSpeed = (leftSpeed * 100) / 127;
         int rightMotorSpeed = (rightSpeed * 100) / 127;
 
-        var left = new SingleMotorCommand
+        var left = new DirectionAndSpeedMotorCommand
         {
             Direction = leftMotorSpeed < 0 ? -1 : (leftMotorSpeed > 0 ? 1 : 0),
             Speed = Math.Abs(leftMotorSpeed)
         };
 
-        var right = new SingleMotorCommand
+        var right = new DirectionAndSpeedMotorCommand
         {
             Direction = rightMotorSpeed < 0 ? -1 : (rightMotorSpeed > 0 ? 1 : 0),
             Speed = Math.Abs(rightMotorSpeed)

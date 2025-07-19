@@ -1,6 +1,5 @@
 ﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
-using System;
 using System.Threading;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
@@ -77,23 +76,23 @@ public class RemoteControlController : ControllerBase
 
         var (leftMotor, rightMotor) = _motorSpeed.GetDcMotorSpeeds(dcMotorSpeed, dcMotorDirection);
 
-        var lowLevelCommand = new LowLevelCommand
+        var directionAndSpeedAllMotorsCommand = new DirectionAndSpeedAllMotorsCommand
         {
             LeftWheel = leftMotor,
             RightWheel = rightMotor,
 
-            Base = SingleMotorCommand.FromReading(baseRotation),
-            Shoulder = SingleMotorCommand.FromReading(shoulder),
-            Elbow = SingleMotorCommand.FromReading(elbow),
-            Arm = SingleMotorCommand.FromReading(arm),
-            Wrist = SingleMotorCommand.FromReading(wrist),
-            Gripper = SingleMotorCommand.FromReading(gripper)
+            Base = DirectionAndSpeedMotorCommand.FromReading(baseRotation),
+            Shoulder = DirectionAndSpeedMotorCommand.FromReading(shoulder),
+            Elbow = DirectionAndSpeedMotorCommand.FromReading(elbow),
+            Arm = DirectionAndSpeedMotorCommand.FromReading(arm),
+            Wrist = DirectionAndSpeedMotorCommand.FromReading(wrist),
+            Gripper = DirectionAndSpeedMotorCommand.FromReading(gripper)
         };
 
-        var json = System.Text.Json.JsonSerializer.Serialize(lowLevelCommand);
-        _logger.LogInformation("Low level command JSON: {Json}", json);
+        var json = System.Text.Json.JsonSerializer.Serialize(directionAndSpeedAllMotorsCommand);
+        _logger.LogInformation("Direction and speed all motors command JSON: {Json}", json);
 
-        _hardwareControl.SendLowLevelCommand(lowLevelCommand);
+        _hardwareControl.SendDirectionAndSpeedAllMotorsCommand(directionAndSpeedAllMotorsCommand);
 
         return Ok(new CommandResponse());
     }

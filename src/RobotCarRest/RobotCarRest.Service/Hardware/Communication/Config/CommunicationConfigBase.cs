@@ -1,6 +1,6 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
-namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Configuration
+namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Config
 {
     /// <summary>
     /// Base class for hardware communication configurations.

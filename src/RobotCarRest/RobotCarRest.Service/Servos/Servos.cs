@@ -1,8 +1,11 @@
 ﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Paregov.RobotCar.Rest.Service.Hardware;
+using Paregov.RobotCar.Rest.Service.Models.Enums;
+using Paregov.RobotCar.Rest.Service.Models.LowLevel;
 
 namespace Paregov.RobotCar.Rest.Service.Servos
 {
@@ -55,8 +58,54 @@ namespace Paregov.RobotCar.Rest.Service.Servos
                 return false;
             }
 
-            // TODO: Implement actual hardware communication
-            // Example: _hardwareControl.SendServoCommand(servoId, positionDegrees, accelerationDegreesPerSecSquared, velocityDegreesPerSecond, timeoutMs);
+            var positionCommand = new PositionAndSpeedServoCommand(
+                (Int16)positionDegrees,
+                50  // Hardcoded acceleration for now
+                );
+
+
+            var command = new CommandData8Bytes(
+                CommandType.BaseMotorPositionCommand,
+                positionCommand);
+
+            switch (servoId)
+            {
+                case 0:
+                    command.CommandType = (byte)CommandType.BaseMotorPositionCommand;
+                    break;
+
+                case 1:
+                    command.CommandType = (byte)CommandType.ShoulderMotorPositionCommand;
+                    break;
+
+                case 2:
+                    command.CommandType = (byte)CommandType.ElbowMotorPositionCommand;
+                    break;
+
+                case 3:
+                    command.CommandType = (byte)CommandType.ArmMotorPositionCommand;
+                    break;
+
+                case 4:
+                    command.CommandType = (byte)CommandType.WristMotorPositionCommand;
+                    break;
+
+                case 6:
+                    command.CommandType = (byte)CommandType.GripperMotorPositionCommand;
+                    break;
+
+                default:
+                    _logger.LogError("Servo ID {ServoId} is not allowed to be controlled", servoId);
+                    return false;
+            }
+
+            var result = _hardwareControl.Send8ByteCommand(command);
+
+            if (!result)
+            {
+                _logger.LogError("Failed to send command to servo {ServoId}", servoId);
+                return false;
+            }
 
             _logger.LogInformation("Servo {ServoId} position set successfully", servoId);
             return true;

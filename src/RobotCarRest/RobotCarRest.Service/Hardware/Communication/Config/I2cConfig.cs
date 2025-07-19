@@ -1,9 +1,9 @@
-// Copyright © Svetoslav Paregov. All rights reserved.
+ï»¿// Copyright Â© Svetoslav Paregov. All rights reserved.
 
 
-// Copyright © Svetoslav Paregov. All rights reserved.
+// Copyright Â© Svetoslav Paregov. All rights reserved.
 
-namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Configuration
+namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Config
 {
     /// <summary>
     /// Configuration class for I2C communication parameters.

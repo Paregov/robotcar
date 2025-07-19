@@ -1,10 +1,11 @@
-// Copyright � Svetoslav Paregov. All rights reserved.
+﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
 using System;
 using System.IO.Ports;
 using System.Text;
 using Microsoft.Extensions.Logging;
-using Paregov.RobotCar.Rest.Service.Hardware.Communication.Configuration;
+using Microsoft.Extensions.Options;
+using Paregov.RobotCar.Rest.Service.Hardware.Communication.Config;
 
 namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 {
@@ -15,6 +16,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
     public class UartCommunication : IHardwareCommunication
     {
         private readonly ILogger<UartCommunication> _logger;
+        private readonly IOptions<UartOptions> _options;
         private readonly object _lock = new();
         
         private SerialPort? _serialPort;
@@ -24,9 +26,20 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
         /// Initializes a new instance of the UartCommunication class.
         /// </summary>
         /// <param name="logger">Logger instance</param>
-        public UartCommunication(ILogger<UartCommunication> logger)
+        /// <param name="options">UART configuration options</param>
+        public UartCommunication(
+            ILogger<UartCommunication> logger,
+            IOptions<UartOptions> options)
         {
             _logger = logger;
+            _options = options;
+            
+            // Auto-initialize with the provided configuration
+            var config = _options.Value.ToUartConfig();
+            if (!InitializeChannel(config))
+            {
+                _logger.LogWarning("Failed to auto-initialize UART communication channel during construction");
+            }
         }
 
         /// <summary>
@@ -74,7 +87,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 
                 _serialPort.Open();
                 
-                _logger.LogInformation($"UART device initialized successfully. {_config.GetConfigurationSummary()}");
+                _logger.LogInformation("UART device initialized successfully. {Config}", _config.GetConfigurationSummary());
                 return true;
             }
             catch (Exception ex)
@@ -83,6 +96,36 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
                 FreeChannel();
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Re-initializes the UART communication channel with a custom port name override.
+        /// </summary>
+        /// <param name="portNameOverride">Override port name</param>
+        /// <returns>True if initialization was successful; otherwise, false</returns>
+        public bool ReinitializeWithPortName(string portNameOverride)
+        {
+            _logger.LogInformation("Re-initializing UART with port name override: {PortName}", portNameOverride);
+            
+            var config = _options.Value.ToUartConfig();
+            config.PortName = portNameOverride;
+            
+            return InitializeChannel(config);
+        }
+
+        /// <summary>
+        /// Re-initializes the UART communication channel with a custom baud rate override.
+        /// </summary>
+        /// <param name="baudRateOverride">Override baud rate</param>
+        /// <returns>True if initialization was successful; otherwise, false</returns>
+        public bool ReinitializeWithBaudRate(int baudRateOverride)
+        {
+            _logger.LogInformation("Re-initializing UART with baud rate override: {BaudRate}", baudRateOverride);
+            
+            var config = _options.Value.ToUartConfig();
+            config.BaudRate = baudRateOverride;
+            
+            return InitializeChannel(config);
         }
 
         /// <summary>
@@ -175,7 +218,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
                 {
                     if (_config!.EnableDebugLogging)
                     {
-                        _logger.LogDebug($"Sending UART bytes: [{string.Join(", ", message)}]");
+                        _logger.LogDebug("Sending UART bytes: [{Bytes}]", string.Join(", ", message));
                     }
 
                     _serialPort!.Write(message, 0, message.Length);

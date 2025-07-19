@@ -5,8 +5,9 @@ using System.Device.Spi;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Paregov.RobotCar.Rest.Service.Hardware.Communication;
-using Paregov.RobotCar.Rest.Service.Hardware.Communication.Configuration;
+using Paregov.RobotCar.Rest.Service.Hardware.Communication.Config;
 
 namespace Paregov.RobotCar.Rest.Service.Hardware.SPI
 {
@@ -18,16 +19,28 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.SPI
     public class SpiCommunication : IHardwareCommunication
     {
         private readonly ILogger<SpiCommunication> _logger;
+        private readonly IOptions<SpiOptions> _options;
         private SpiDevice? _spiDevice;
         private SpiConfig? _config;
 
         /// <summary>
         /// Initializes a new instance of the SpiCommunication class.
         /// </summary>
-        /// <param name="logger">Logger</param>
-        public SpiCommunication(ILogger<SpiCommunication> logger)
+        /// <param name="logger">Logger instance</param>
+        /// <param name="options">SPI configuration options</param>
+        public SpiCommunication(
+            ILogger<SpiCommunication> logger,
+            IOptions<SpiOptions> options)
         {
             _logger = logger;
+            _options = options;
+            
+            // Auto-initialize with the provided configuration
+            var config = _options.Value.ToSpiConfig();
+            if (!InitializeChannel(config))
+            {
+                _logger.LogWarning("Failed to auto-initialize SPI communication channel during construction");
+            }
         }
 
         /// <summary>
@@ -80,6 +93,36 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.SPI
                 FreeChannel();
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Re-initializes the SPI communication channel with a custom clock frequency override.
+        /// </summary>
+        /// <param name="clockFrequencyOverride">Override clock frequency</param>
+        /// <returns>True if initialization was successful; otherwise, false</returns>
+        public bool ReinitializeWithClockFrequency(int clockFrequencyOverride)
+        {
+            _logger.LogInformation("Re-initializing SPI with clock frequency override: {ClockFrequency} Hz", clockFrequencyOverride);
+            
+            var config = _options.Value.ToSpiConfig();
+            config.ClockFrequency = clockFrequencyOverride;
+            
+            return InitializeChannel(config);
+        }
+
+        /// <summary>
+        /// Re-initializes the SPI communication channel with a custom chip select line override.
+        /// </summary>
+        /// <param name="chipSelectLineOverride">Override chip select line</param>
+        /// <returns>True if initialization was successful; otherwise, false</returns>
+        public bool ReinitializeWithChipSelectLine(int chipSelectLineOverride)
+        {
+            _logger.LogInformation("Re-initializing SPI with chip select line override: {ChipSelectLine}", chipSelectLineOverride);
+            
+            var config = _options.Value.ToSpiConfig();
+            config.ChipSelectLine = chipSelectLineOverride;
+            
+            return InitializeChannel(config);
         }
 
         /// <summary>

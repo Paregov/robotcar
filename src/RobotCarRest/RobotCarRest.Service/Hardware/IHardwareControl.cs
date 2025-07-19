@@ -9,9 +9,9 @@ namespace Paregov.RobotCar.Rest.Service.Hardware
     {
         public string SendStringCommandWithResponse(string command);
 
-        public bool Send8ByteCommand(byte[] command);
+        public bool Send8ByteCommand(CommandData8Bytes command);
 
-        public bool SendLowLevelCommand(LowLevelCommand command);
+        public bool SendDirectionAndSpeedAllMotorsCommand(DirectionAndSpeedAllMotorsCommand command);
 
         public bool PrepareForFirmwareUpdate();
 

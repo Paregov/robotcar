@@ -1,6 +1,5 @@
 ﻿// Copyright © Svetoslav Paregov. All rights reserved.
 
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Asp.Versioning;
@@ -42,12 +41,13 @@ public class ServosController : ControllerBase
 
         if (servoId < 0 || servoId > 255)
         {
-            return BadRequest(new ServoPositionResponse 
-            { 
-                IsSuccess = false, 
-                ServoId = servoId,
-                Details = "Servo ID must be between 0 and 255"
-            });
+            return BadRequest(
+                new ServoPositionResponse
+                {
+                    IsSuccess = false,
+                    ServoId = servoId,
+                    Details = "Servo ID must be between 0 and 255",
+                });
         }
 
         var position = _servos.GetServoPositionDegrees(servoId);
@@ -57,16 +57,6 @@ public class ServosController : ControllerBase
             ServoId = servoId,
             CurrentPositionDegrees = position
         });
-    }
-
-    [ApiVersion("1.0")]
-    [HttpPost("api/v{version:apiVersion}/servos")]
-    public ActionResult<CommandResponse> SetServos(
-        [FromBody] CommandRequest commandRequest,
-        CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("Setting servos with command request");
-        return Ok(new CommandResponse());
     }
 
     /// <summary>

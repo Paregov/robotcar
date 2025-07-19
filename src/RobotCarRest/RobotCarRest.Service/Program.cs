@@ -11,6 +11,7 @@ using NetworkController.ZipUtilities;
 using Paregov.RobotCar.Rest.Service.BusinessLogic;
 using Paregov.RobotCar.Rest.Service.Hardware;
 using Paregov.RobotCar.Rest.Service.Hardware.Communication;
+using Paregov.RobotCar.Rest.Service.Hardware.Communication.Config;
 using Paregov.RobotCar.Rest.Service.Hardware.SPI;
 using Paregov.RobotCar.Rest.Service.Servos;
 using Paregov.RobotCar.Rest.Service.SoftwareUpdate;
@@ -47,7 +48,15 @@ namespace Paregov.RobotCar.Rest.Service
                     "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} - {Message:lj}{NewLine}{Exception}", // A detailed format.
                     retainedFileCountLimit: 7 // Keep the last 7 daily logs.
                 ));
-        
+
+            // Configure communication options from appsettings.json
+            builder.Services.Configure<UartOptions>(
+                builder.Configuration.GetSection(UartOptions.SectionName));
+            builder.Services.Configure<SpiOptions>(
+                builder.Configuration.GetSection(SpiOptions.SectionName));
+            builder.Services.Configure<I2cOptions>(
+                builder.Configuration.GetSection(I2cOptions.SectionName));
+
             // Add services to the container.
             builder.Services.AddApiVersioning(options =>
             {
@@ -73,10 +82,21 @@ namespace Paregov.RobotCar.Rest.Service
                 c.SwaggerDoc("v2", new OpenApiInfo { Title = "My API - V2", Version = "v2.0" });
             });
 
+            // Register communication factory (still useful for custom configurations)
+            builder.Services.AddSingleton<CommunicationFactory>();
+
+            // Register communication instances directly with IOptions injection
+            builder.Services.AddSingleton<SpiCommunication>();
+            builder.Services.AddSingleton<UartCommunication>(); 
+            builder.Services.AddSingleton<I2CCommunication>();
+
+            // Register primary communication interface (defaults to SPI)
+            builder.Services.AddSingleton<IHardwareCommunication>(serviceProvider =>
+                serviceProvider.GetRequiredService<SpiCommunication>());
+
+            // Register other services
             builder.Services.AddSingleton<IServos, Servos.Servos>();
             builder.Services.AddSingleton<IUnzipUtility, UnzipUtility>();
-            builder.Services.AddSingleton<IHardwareCommunication, SpiCommunication>();
-            builder.Services.AddSingleton<UartCommunication>();
             builder.Services.AddSingleton<IHardwareControl, HardwareControl>();
             builder.Services.AddSingleton<IFirmwareUpdater, FirmwareUpdater>();
             builder.Services.AddSingleton<IRestUpdater, RestUpdater>();
@@ -85,14 +105,31 @@ namespace Paregov.RobotCar.Rest.Service
             builder.WebHost.ConfigureKestrel(options =>
             {
                 options.ListenAnyIP(5000);
-                options.Limits.MaxRequestBodySize = 50 * 1024 * 1024; // Set max request body size to 10 MB
+                options.Limits.MaxRequestBodySize = 50 * 1024 * 1024; // Set max request body size to 50 MB
             });
 
             var app = builder.Build();
 
             var logger = app.Services.GetRequiredService<ILogger<Program>>();
             logger.LogInformation("Starting NetworkController application...");
-            logger.LogInformation($"Base directory: {baseDirectory}.");
+            logger.LogInformation("Base directory: {BaseDirectory}.", baseDirectory);
+
+            // Log configuration validation and communication initialization status
+            try
+            {
+                var spiComm = app.Services.GetRequiredService<SpiCommunication>();
+                var uartComm = app.Services.GetRequiredService<UartCommunication>();
+                var i2cComm = app.Services.GetRequiredService<I2CCommunication>();
+                
+                logger.LogInformation("Communication services initialized:");
+                logger.LogInformation("  - SPI Communication: {Status}", spiComm.IsChannelReady ? "Ready" : "Not Ready");
+                logger.LogInformation("  - UART Communication: {Status}", uartComm.IsChannelReady ? "Ready" : "Not Ready");
+                logger.LogInformation("  - I2C Communication: {Status}", i2cComm.IsChannelReady ? "Ready" : "Not Ready");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to initialize communication services");
+            }
 
             app.UseSwagger();
             app.UseSwaggerUI();
