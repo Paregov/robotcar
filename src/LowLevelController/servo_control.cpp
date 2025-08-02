@@ -239,6 +239,7 @@ void process_servo_motor_speed(motor_speed_t *motor, uint8_t motor_index)
  */
 bool servo_motors_timer_callback(struct repeating_timer *t)
 {
+    // Process each servo motor speed.
     process_servo_motor_speed(&servo_motor_speeds_array[BASE_MOTOR_INDEX], BASE_MOTOR_INDEX);
     process_servo_motor_speed(&servo_motor_speeds_array[SHOULDER_MOTOR_INDEX], SHOULDER_MOTOR_INDEX);
     process_servo_motor_speed(&servo_motor_speeds_array[ELBOW_MOTOR_INDEX], ELBOW_MOTOR_INDEX);
@@ -246,11 +247,17 @@ bool servo_motors_timer_callback(struct repeating_timer *t)
     process_servo_motor_speed(&servo_motor_speeds_array[WRIST_MOTOR_INDEX], WRIST_MOTOR_INDEX);
     process_servo_motor_speed(&servo_motor_speeds_array[GRIPPER_MOTOR_INDEX], GRIPPER_MOTOR_INDEX);
 
+    // In here we are going to process the servo motor position updates as well.
+
     return true; // Keep the timer repeating
 }
 
 void init_servos()
 {
+    // TODO: Get the servos info from the main controller. This way we can set the degrees and limits dynamically.
+    // And change the them without recompiling the code.
+    // For now, we will use the predefined servos info.
+
     // Base
     servos_info_array[BASE_MOTOR_INDEX] = servo_270;
     servos_info_array[BASE_MOTOR_INDEX].pwm_number = 0;
@@ -279,7 +286,7 @@ void init_servos()
     servos_info_array[5].pwm_number = 5;
 
     // Gripper
-    servos_info_array[GRIPPER_MOTOR_INDEX] = servo_270;
+    servos_info_array[GRIPPER_MOTOR_INDEX] = servo_180;
     servos_info_array[GRIPPER_MOTOR_INDEX].pwm_number = 6;
     //servos_info_array[GRIPPER_MOTOR_INDEX].bottom_degrees_limit = 45;
     //servos_info_array[GRIPPER_MOTOR_INDEX].top_degrees_limit = 225;
@@ -288,15 +295,9 @@ void init_servos()
     servos_info_array[7] = servo_270;
     servos_info_array[7].pwm_number = 7;
     
-    set_servo_position_in_degrees(0, servos_info_array[0].degrees/2); // base
-    set_servo_position_in_degrees(1, servos_info_array[1].degrees/2); // shoulder
-    set_servo_position_in_degrees(2, servos_info_array[2].degrees/2); // elbow
-    set_servo_position_in_degrees(3, servos_info_array[3].degrees/2); // arm
-    set_servo_position_in_degrees(4, servos_info_array[4].degrees/2); // wrist
-    // set_servo_position_in_degrees(5, servos[5].degrees/2); // wrist2 - Not present in this Robot Arm
-    set_servo_position_in_degrees(6, servos_info_array[6].degrees/2); // gripper
-    // set_servo_position_in_degrees(7, servos[7].degrees/2); // - Not present in this Robot Arm
-    
+    // Intentionaly I am not setting the degrees in the initialization.
+    // The degrees will be set when the robot arm is initialized from the main controller.
+
     // Create a repeating timer that calls servo_motors_timer_callback.
     // The first argument is the interval in microseconds.
     // A negative value means the timer will be fired relative to the previous scheduled fire time,
@@ -305,16 +306,16 @@ void init_servos()
     add_repeating_timer_us(-TIMER_INTERVAL_US, servo_motors_timer_callback, NULL, &servo_control_timer);
 }
 
-void set_servo_position_in_degrees(uint8_t servo, float degrees)
+void set_servo_position_in_degrees(uint8_t servo, int16_t degrees)
 {
     // If we try to set a bigger than allowed degrees, we will set the maximum allowed degrees.
-    if ((uint16_t)degrees > servos_info_array[servo].degrees)
+    if (degrees > servos_info_array[servo].degrees)
     {
-        degrees = (float)servos_info_array[servo].degrees;
+        degrees = servos_info_array[servo].degrees;
     }
-    else if (degrees <= 0.0f)
+    else if (degrees <= 0)
     {
-        degrees = 0.0f; // If we try to set a negative degrees, we will set 0 degrees.
+        degrees = 0; // If we try to set a negative degrees, we will set 0 degrees.
     }
 
     // Since we are using absolute position in degrees, we are getting the left position in microseconds.
@@ -332,7 +333,7 @@ void set_servo_position_in_degrees(uint8_t servo, float degrees)
         pulse_width = servos_info_array[servo].left_us;
     }
 
-    servos_info_array[servo].current_degrees = (uint16_t)degrees;
+    servos_info_array[servo].current_degrees = degrees;
 
     set_pwm_pulse_width_us(servos_info_array[servo].pwm_number, (uint16_t)pulse_width);
 }

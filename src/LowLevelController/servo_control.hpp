@@ -19,19 +19,19 @@ typedef struct
     // Maximum degrees of movement for the servo.
     // This is what the servo supports.
     // For example, 180 degrees or 270 degrees.
-    uint16_t degrees;
+    int16_t degrees;
 
     // Current position in degrees for the servo.
-    uint16_t current_degrees;
+    int16_t current_degrees;
 
     // Bottom limit in degrees for the servo.
     // Software limit to prevent the servo from going below this value.
-    uint16_t bottom_degrees_limit;
+    int16_t bottom_degrees_limit;
 
     // Top limit in degrees for the servo.
     // Software limit to prevent the servo from going above this value.
-    uint16_t top_degrees_limit;
-    
+    int16_t top_degrees_limit;
+
     // Left position in micro seconds for the servo (us).
     float left_us;
     
@@ -52,7 +52,7 @@ typedef struct
 } servo_info_t;
 
 void init_servos();
-void set_servo_position_in_degrees(uint8_t servo, float degrees);
+void set_servo_position_in_degrees(uint8_t servo, int16_t degrees);
 void set_base_servo_speed(motor_speed_t speed);
 void set_shoulder_servo_speed(motor_speed_t speed);
 void set_elbow_servo_speed(motor_speed_t speed);
