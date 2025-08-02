@@ -1,23 +1,24 @@
 @NetworkController_HostAddress = http://localhost:5000
 
+# Test basic connectivity
 GET {{NetworkController_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
 
-# Get all servos status
+# Check system status (should show IP addresses and version in console/display)
 GET {{NetworkController_HostAddress}}/api/v1.0/servos
 Accept: application/json
 
 ###
 
-# Get specific servo position
+# Test servo endpoints to verify hardware communication is working
 GET {{NetworkController_HostAddress}}/api/v1.0/servos/0/position
 Accept: application/json
 
 ###
 
-# Set servo position with full control parameters
+# Send a test servo command
 PUT {{NetworkController_HostAddress}}/api/v1.0/servos/0/position
 Content-Type: application/json
 
@@ -31,119 +32,84 @@ Content-Type: application/json
 
 ###
 
-# Set servo position with default parameters
-PUT {{NetworkController_HostAddress}}/api/v1.0/servos/1/position
+# Test remote control (joystick) endpoint
+POST {{NetworkController_HostAddress}}/api/v1.0/remotecontrol/joysticks
 Content-Type: application/json
 
 {
-  "servoId": 1,
-  "positionDegrees": -30.0
+  "joysticks": [128, 128, 128, 128, 128, 128, 128, 128]
 }
 
 ###
 
-# Set multiple servo positions simultaneously (using List in JSON)
-PUT {{NetworkController_HostAddress}}/api/v1.0/servos/positions
-Content-Type: application/json
-
-{
-  "servoCommands": [
-    {
-      "servoId": 0,
-      "positionDegrees": 90.0,
-      "accelerationDegreesPerSecSquared": 150.0,
-      "velocityDegreesPerSecond": 75.0,
-      "timeoutMs": 2000
-    },
-    {
-      "servoId": 1,
-      "positionDegrees": -45.0,
-      "accelerationDegreesPerSecSquared": 100.0,
-      "velocityDegreesPerSecond": 50.0,
-      "timeoutMs": 2500
-    },
-    {
-      "servoId": 2,
-      "positionDegrees": 0.0,
-      "accelerationDegreesPerSecSquared": 200.0,
-      "velocityDegreesPerSecond": 80.0,
-      "timeoutMs": 1500
-    }
-  ],
-  "executeSimultaneously": true
-}
-
-###
-
-# Set multiple servo positions sequentially (using List in JSON)
-PUT {{NetworkController_HostAddress}}/api/v1.0/servos/positions
-Content-Type: application/json
-
-{
-  "servoCommands": [
-    {
-      "servoId": 0,
-      "positionDegrees": 0.0
-    },
-    {
-      "servoId": 1,
-      "positionDegrees": 0.0
-    },
-    {
-      "servoId": 2,
-      "positionDegrees": 45.0,
-      "accelerationDegreesPerSecSquared": 300.0,
-      "velocityDegreesPerSecond": 120.0,
-      "timeoutMs": 4000
-    }
-  ],
-  "executeSimultaneously": false
-}
-
-###
-
-# Center all servos
-PUT {{NetworkController_HostAddress}}/api/v1.0/servos/center
-Content-Type: application/json
-
-###
-
-# Firmware Update with UART interface (default)
-POST {{NetworkController_HostAddress}}/api/v1.0/software/firmware/
-Content-Type: application/octet-stream
-
-< ./path/to/firmware.bin
-
-###
-
-# Firmware Update with UART interface (explicitly specified)
-POST {{NetworkController_HostAddress}}/api/v1.0/software/firmware/?updateInterface=uart
-Content-Type: application/octet-stream
-
-< ./path/to/firmware.bin
-
-###
-
-# Firmware Update with SPI interface
-POST {{NetworkController_HostAddress}}/api/v1.0/software/firmware/?updateInterface=spi
-Content-Type: application/octet-stream
-
-< ./path/to/firmware.bin
-
-###
-
-# Firmware Update with invalid interface (will default to UART)
-POST {{NetworkController_HostAddress}}/api/v1.0/software/firmware/?updateInterface=invalid
-Content-Type: application/octet-stream
-
-< ./path/to/firmware.bin
-
-###
-
-# REST Server Update
-POST {{NetworkController_HostAddress}}/api/v1.0/software/restserver/
-Content-Type: application/octet-stream
-
-< ./path/to/restserver.zip
+# Note: SSD1306 Display Testing with Direct I2C Communication
+# 
+# UPDATED: The SSD1306 display now uses System.Device.I2c.I2cDevice directly 
+# instead of the custom I2CCommunication class. This provides:
+# - Better performance with direct .NET IoT APIs
+# - Simplified architecture with fewer abstraction layers
+# - Native I2C error handling and diagnostics
+# 
+# The display functionality will be automatically tested when the application starts.
+# Check the console logs for:
+# - "Initializing SSD1306 display with I2C bus 1, address 0x3C..." 
+# - "SSD1306 display initialized successfully in RobotCarWorker"
+# - "System information displayed on SSD1306"
+# - "Current version: v1.2.3.4" (or similar version string)
+# - "Local IP Address: [IP_ADDRESS]"
+# 
+# If you have an actual SSD1306 display connected to I2C bus 1 at address 0x3C (60), 
+# you should see the enhanced display showing:
+# - "Robot Car System" title
+# - Current software version (e.g., "Ver: v1.2.3.4")
+# - Separator line
+# - "IP Addresses:" label
+# - List of up to 3 IP addresses (to make room for version info)
+# - Real-time timestamp in bottom right corner
+# 
+# Technical Implementation:
+# - Uses I2cDevice.Create(new I2cConnectionSettings(busId, deviceAddress))
+# - Direct I2cDevice.Write() calls for commands and data
+# - Command format: [0x00][Command] for SSD1306 commands
+# - Data format: [0x40][Data...] for display buffer updates
+# - Chunked transmission (32 bytes) to avoid I2C buffer limits
+# - Native .NET IoT exception handling for I2C errors
+# 
+# Configuration (appsettings.json):
+# {
+#   "Communication": {
+#     "Ssd1306": {
+#       "BusId": 1,              // I2C bus number
+#       "DeviceAddress": 60,     // 0x3C in decimal (SSD1306 address)
+#       "BusSpeed": 400000,      // 400kHz fast mode
+#       "EnableDebugLogging": false
+#     }
+#   }
+# }
+# 
+# Hardware Wiring (Raspberry Pi):
+# SSD1306 GND ? Pi GND (Pin 6)
+# SSD1306 VCC ? Pi 3.3V (Pin 1)  
+# SSD1306 SDA ? Pi GPIO 2 (Pin 3) - I2C Data
+# SSD1306 SCL ? Pi GPIO 3 (Pin 5) - I2C Clock
+# 
+# I2C Setup Commands:
+# sudo raspi-config ? Interface Options ? I2C ? Enable
+# sudo apt install i2c-tools
+# i2cdetect -y 1  # Should show device at 3c
+# 
+# Display Layout Example:
+# Robot Car System
+# ============================
+# Ver: v1.2.3.4
+# ============================
+# IP Addresses:
+#      192.168.1.100
+#      10.0.0.50
+#                     12:34:56
+# 
+# The display updates every 30 seconds with a new timestamp.
+# Version information is displayed once at startup and remains static.
+# All I2C communication now happens through native .NET APIs for optimal performance.
 
 ###

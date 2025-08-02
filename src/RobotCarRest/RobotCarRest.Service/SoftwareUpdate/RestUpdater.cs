@@ -54,16 +54,15 @@ namespace Paregov.RobotCar.Rest.Service.SoftwareUpdate
             return result;
         }
 
-        private string GetNextBuildVersion(string baseFolderPath)
+        public Version? GetCurrentVersion()
         {
-            if (!Directory.Exists(baseFolderPath))
+            if (!Directory.Exists(_baseFolder))
             {
                 throw new DirectoryNotFoundException(
-                    $"The specified base folder does not exist: {baseFolderPath}");
+                    $"The specified base folder does not exist: {_baseFolder}");
             }
-
             var subDirectoryPaths = Directory.GetDirectories(
-                baseFolderPath, "*", SearchOption.TopDirectoryOnly);
+                _baseFolder, "*", SearchOption.TopDirectoryOnly);
 
             // Use LINQ to process the directory names.
             var latestVersion = subDirectoryPaths
@@ -75,6 +74,13 @@ namespace Paregov.RobotCar.Rest.Service.SoftwareUpdate
                 })
                 .Where(version => version != null)
                 .MaxBy(v => v);
+
+            return latestVersion;
+        }
+
+        private string GetNextBuildVersion(string baseFolderPath)
+        {
+            var latestVersion = GetCurrentVersion();
 
             if (latestVersion != null)
             {

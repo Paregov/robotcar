@@ -9,7 +9,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Config
     /// Configuration class for I2C communication parameters.
     /// Contains all necessary settings for I2C bus communication.
     /// </summary>
-    public class I2cConfig : CommunicationConfigBase
+    public class I2cConfig
     {
         /// <summary>
         /// Gets or sets the I2C bus ID.
@@ -69,12 +69,39 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Config
         public bool UseRepeatedStart { get; set; } = true;
 
         /// <summary>
+        /// Gets or sets the timeout for communication operations in milliseconds.
+        /// </summary>
+        public int TimeoutMs { get; set; } = 5000;
+
+        /// <summary>
+        /// Gets or sets whether the communication channel should be automatically retried on failure.
+        /// </summary>
+        public bool AutoRetry { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets the maximum number of retry attempts.
+        /// </summary>
+        public int MaxRetryAttempts { get; set; } = 3;
+
+        /// <summary>
+        /// Gets or sets the delay between retry attempts in milliseconds.
+        /// </summary>
+        public int RetryDelayMs { get; set; } = 100;
+
+        /// <summary>
+        /// Gets or sets whether debug logging is enabled for this communication channel.
+        /// </summary>
+        public bool EnableDebugLogging { get; set; } = false;
+
+        /// <summary>
         /// Validates the I2C configuration parameters.
         /// </summary>
         /// <returns>True if the configuration is valid; otherwise, false.</returns>
-        public override bool IsValid()
+        public bool IsValid()
         {
-            return base.IsValid() &&
+            return TimeoutMs > 0 && 
+                   MaxRetryAttempts >= 0 && 
+                   RetryDelayMs >= 0 &&
                    BusId >= 0 &&
                    DeviceAddress >= 0 &&
                    (Use10BitAddressing ? DeviceAddress <= 0x3FF : DeviceAddress <= 0x7F) &&
@@ -89,10 +116,9 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Config
         /// Gets a detailed string representation of the I2C configuration.
         /// </summary>
         /// <returns>A formatted string containing the I2C configuration details.</returns>
-        public override string GetConfigurationSummary()
+        public string GetConfigurationSummary()
         {
-            var baseConfig = base.GetConfigurationSummary();
-            return $"I2C Config - Bus: {BusId}, Address: 0x{DeviceAddress:X2}, 10-bit: {Use10BitAddressing}, Speed: {BusSpeed}Hz, MaxRead: {MaxReadLength}, MaxWrite: {MaxWriteLength}, ClockStretch: {UseClockStretching}, RegAddrLen: {RegisterAddressLength}, RepeatStart: {UseRepeatedStart}, OpDelay: {OperationDelayMs}ms, {baseConfig}";
+            return $"I2C Config - Bus: {BusId}, Address: 0x{DeviceAddress:X2}, 10-bit: {Use10BitAddressing}, Speed: {BusSpeed}Hz, MaxRead: {MaxReadLength}, MaxWrite: {MaxWriteLength}, ClockStretch: {UseClockStretching}, RegAddrLen: {RegisterAddressLength}, RepeatStart: {UseRepeatedStart}, OpDelay: {OperationDelayMs}ms, Timeout: {TimeoutMs}ms, AutoRetry: {AutoRetry}, MaxRetries: {MaxRetryAttempts}, RetryDelay: {RetryDelayMs}ms, Debug: {EnableDebugLogging}";
         }
     }
 }

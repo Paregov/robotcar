@@ -13,7 +13,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
     /// Manages UART communication using SerialPort for sending strings and bytes
     /// with proper configuration and error handling.
     /// </summary>
-    public class UartCommunication : IHardwareCommunication
+    public class UartCommunication : IUartCommunication
     {
         private readonly ILogger<UartCommunication> _logger;
         private readonly IOptions<UartOptions> _options;
@@ -52,15 +52,15 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
         /// </summary>
         /// <param name="config">The UART configuration instance</param>
         /// <returns>True if initialization was successful; otherwise, false</returns>
-        public bool InitializeChannel(CommunicationConfigBase config)
+        public bool InitializeChannel(UartConfig config)
         {
-            if (config is not UartConfig uartConfig)
+            if (config == null)
             {
-                _logger.LogError("Invalid configuration type. Expected UartConfig.");
+                _logger.LogError("UART configuration cannot be null.");
                 return false;
             }
 
-            if (!uartConfig.IsValid())
+            if (!config.IsValid())
             {
                 _logger.LogError("Invalid UART configuration provided.");
                 return false;
@@ -71,7 +71,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
                 // Free existing channel if present
                 FreeChannel();
 
-                _config = uartConfig;
+                _config = config;
 
                 _serialPort = new SerialPort(
                     _config.PortName,

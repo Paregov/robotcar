@@ -13,8 +13,8 @@ using Paregov.RobotCar.Rest.Service.BusinessLogic.Interfaces;
 using Paregov.RobotCar.Rest.Service.Hardware;
 using Paregov.RobotCar.Rest.Service.Hardware.Communication;
 using Paregov.RobotCar.Rest.Service.Hardware.Communication.Config;
-using Paregov.RobotCar.Rest.Service.Hardware.SPI;
 using Paregov.RobotCar.Rest.Service.SoftwareUpdate;
+using Paregov.RobotCar.Rest.Service.Worker;
 using Serilog;
 
 namespace Paregov.RobotCar.Rest.Service
@@ -56,6 +56,8 @@ namespace Paregov.RobotCar.Rest.Service
                 builder.Configuration.GetSection(SpiOptions.SectionName));
             builder.Services.Configure<I2cOptions>(
                 builder.Configuration.GetSection(I2cOptions.SectionName));
+            builder.Services.Configure<Ssd1306Options>(
+                builder.Configuration.GetSection(Ssd1306Options.SectionName));
 
             // Add services to the container.
             builder.Services.AddApiVersioning(options =>
@@ -82,17 +84,14 @@ namespace Paregov.RobotCar.Rest.Service
                 c.SwaggerDoc("v2", new OpenApiInfo { Title = "My API - V2", Version = "v2.0" });
             });
 
-            // Register communication factory (still useful for custom configurations)
-            builder.Services.AddSingleton<CommunicationFactory>();
-
-            // Register communication instances directly with IOptions injection
+            // Register independent communication services
             builder.Services.AddSingleton<SpiCommunication>();
-            builder.Services.AddSingleton<UartCommunication>(); 
-            builder.Services.AddSingleton<I2CCommunication>();
-
-            // Register primary communication interface (defaults to SPI)
-            builder.Services.AddSingleton<IHardwareCommunication>(serviceProvider =>
+            builder.Services.AddSingleton<ISpiCommunication>(serviceProvider =>
                 serviceProvider.GetRequiredService<SpiCommunication>());
+
+            builder.Services.AddSingleton<UartCommunication>();
+            builder.Services.AddSingleton<IUartCommunication>(serviceProvider =>
+                serviceProvider.GetRequiredService<UartCommunication>());
 
             // Register other services
             builder.Services.AddSingleton<IServos, Servos>();
@@ -101,6 +100,9 @@ namespace Paregov.RobotCar.Rest.Service
             builder.Services.AddSingleton<IFirmwareUpdater, FirmwareUpdater>();
             builder.Services.AddSingleton<IRestUpdater, RestUpdater>();
             builder.Services.AddSingleton<IMotorSpeed, MotorSpeed>();
+            
+            // Register the background worker service
+            builder.Services.AddHostedService<RobotCarWorker>();
 
             builder.WebHost.ConfigureKestrel(options =>
             {
@@ -117,14 +119,13 @@ namespace Paregov.RobotCar.Rest.Service
             // Log configuration validation and communication initialization status
             try
             {
-                var spiComm = app.Services.GetRequiredService<SpiCommunication>();
-                var uartComm = app.Services.GetRequiredService<UartCommunication>();
-                var i2cComm = app.Services.GetRequiredService<I2CCommunication>();
-                
-                logger.LogInformation("Communication services initialized:");
+                var spiComm = app.Services.GetRequiredService<ISpiCommunication>();
+                var uartComm = app.Services.GetRequiredService<IUartCommunication>();
+
+                logger.LogInformation("Independent communication services initialized:");
                 logger.LogInformation("  - SPI Communication: {Status}", spiComm.IsChannelReady ? "Ready" : "Not Ready");
                 logger.LogInformation("  - UART Communication: {Status}", uartComm.IsChannelReady ? "Ready" : "Not Ready");
-                logger.LogInformation("  - I2C Communication: {Status}", i2cComm.IsChannelReady ? "Ready" : "Not Ready");
+                logger.LogInformation("  - SSD1306 Display: Uses I2cDevice directly (initialized in RobotCarWorker)");
             }
             catch (Exception ex)
             {

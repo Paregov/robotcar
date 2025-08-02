@@ -6,17 +6,16 @@ using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Paregov.RobotCar.Rest.Service.Hardware.Communication;
 using Paregov.RobotCar.Rest.Service.Hardware.Communication.Config;
 
-namespace Paregov.RobotCar.Rest.Service.Hardware.SPI
+namespace Paregov.RobotCar.Rest.Service.Hardware.Communication
 {
     /// <summary>
     /// Manages SPI communication on a Raspberry Pi for sending strings
     /// with a built-in confirmation mechanism.
     /// This class acts as the SPI Master.
     /// </summary>
-    public class SpiCommunication : IHardwareCommunication
+    public class SpiCommunication : ISpiCommunication
     {
         private readonly ILogger<SpiCommunication> _logger;
         private readonly IOptions<SpiOptions> _options;
@@ -53,15 +52,15 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.SPI
         /// </summary>
         /// <param name="config">The SPI configuration instance</param>
         /// <returns>True if initialization was successful; otherwise, false</returns>
-        public bool InitializeChannel(CommunicationConfigBase config)
+        public bool InitializeChannel(SpiConfig config)
         {
-            if (config is not SpiConfig spiConfig)
+            if (config == null)
             {
-                _logger.LogError("Invalid configuration type. Expected SpiConfig.");
+                _logger.LogError("SPI configuration cannot be null.");
                 return false;
             }
 
-            if (!spiConfig.IsValid())
+            if (!config.IsValid())
             {
                 _logger.LogError("Invalid SPI configuration provided.");
                 return false;
@@ -72,7 +71,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.SPI
                 // Dispose existing device if present
                 FreeChannel();
 
-                _config = spiConfig;
+                _config = config;
 
                 SpiConnectionSettings connectionSettings = new(_config.BusId, _config.ChipSelectLine)
                 {

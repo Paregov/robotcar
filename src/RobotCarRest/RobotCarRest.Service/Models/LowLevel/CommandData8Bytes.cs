@@ -40,5 +40,17 @@ namespace Paregov.RobotCar.Rest.Service.Models.LowLevel
         public byte CommandType { get; set; }
 
         public byte[] Data { get; init; } = new byte[7];
+
+        /// <summary>
+        /// Converts the command data to a byte array for transmission.
+        /// </summary>
+        /// <returns>An 8-byte array containing the command type and data</returns>
+        public readonly byte[] ToByteArray()
+        {
+            var result = new byte[8];
+            result[0] = CommandType;
+            Array.Copy(Data, 0, result, 1, 7);
+            return result;
+        }
     }
 }

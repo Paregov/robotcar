@@ -113,7 +113,8 @@ public class SoftwareController : ControllerBase
             return parsedInterface;
         }
 
-        _logger.LogWarning($"Invalid update interface '{interfaceString}' specified, defaulting to UART. Valid options are: {string.Join(", ", Enum.GetNames<FirmwareUpdateInterface>())}");
+        _logger.LogWarning(
+            $"Invalid update interface '{interfaceString}' specified, defaulting to UART. Valid options are: {string.Join(", ", Enum.GetNames<FirmwareUpdateInterface>())}");
         return FirmwareUpdateInterface.Uart;
     }
 

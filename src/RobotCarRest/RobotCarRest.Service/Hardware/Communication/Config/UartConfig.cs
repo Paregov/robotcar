@@ -8,7 +8,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Config
     /// Configuration class for UART communication parameters.
     /// Contains all necessary settings for serial port communication.
     /// </summary>
-    public class UartConfig : CommunicationConfigBase
+    public class UartConfig
     {
         /// <summary>
         /// Gets or sets the serial port name (e.g., "/dev/serial0", "COM1").
@@ -66,12 +66,39 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Config
         public byte[] EndBytes { get; set; } = { 0xDD, 0xEE, 0xFF };
 
         /// <summary>
+        /// Gets or sets the timeout for communication operations in milliseconds.
+        /// </summary>
+        public int TimeoutMs { get; set; } = 5000;
+
+        /// <summary>
+        /// Gets or sets whether the communication channel should be automatically retried on failure.
+        /// </summary>
+        public bool AutoRetry { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets the maximum number of retry attempts.
+        /// </summary>
+        public int MaxRetryAttempts { get; set; } = 3;
+
+        /// <summary>
+        /// Gets or sets the delay between retry attempts in milliseconds.
+        /// </summary>
+        public int RetryDelayMs { get; set; } = 100;
+
+        /// <summary>
+        /// Gets or sets whether debug logging is enabled for this communication channel.
+        /// </summary>
+        public bool EnableDebugLogging { get; set; } = false;
+
+        /// <summary>
         /// Validates the UART configuration parameters.
         /// </summary>
         /// <returns>True if the configuration is valid; otherwise, false.</returns>
-        public override bool IsValid()
+        public bool IsValid()
         {
-            return base.IsValid() &&
+            return TimeoutMs > 0 && 
+                   MaxRetryAttempts >= 0 && 
+                   RetryDelayMs >= 0 &&
                    !string.IsNullOrWhiteSpace(PortName) &&
                    BaudRate > 0 &&
                    DataBits >= 5 && DataBits <= 8 &&
@@ -84,10 +111,9 @@ namespace Paregov.RobotCar.Rest.Service.Hardware.Communication.Config
         /// Gets a detailed string representation of the UART configuration.
         /// </summary>
         /// <returns>A formatted string containing the UART configuration details.</returns>
-        public override string GetConfigurationSummary()
+        public string GetConfigurationSummary()
         {
-            var baseConfig = base.GetConfigurationSummary();
-            return $"UART Config - Port: {PortName}, Baud: {BaudRate}, Parity: {Parity}, DataBits: {DataBits}, StopBits: {StopBits}, Handshake: {Handshake}, ReadTimeout: {ReadTimeoutMs}ms, WriteTimeout: {WriteTimeoutMs}ms, UseFraming: {UseFraming}, {baseConfig}";
+            return $"UART Config - Port: {PortName}, Baud: {BaudRate}, Parity: {Parity}, DataBits: {DataBits}, StopBits: {StopBits}, Handshake: {Handshake}, ReadTimeout: {ReadTimeoutMs}ms, WriteTimeout: {WriteTimeoutMs}ms, UseFraming: {UseFraming}, Timeout: {TimeoutMs}ms, AutoRetry: {AutoRetry}, MaxRetries: {MaxRetryAttempts}, RetryDelay: {RetryDelayMs}ms, Debug: {EnableDebugLogging}";
         }
     }
 }

@@ -11,17 +11,17 @@ namespace Paregov.RobotCar.Rest.Service.Hardware
     public class HardwareControl : IHardwareControl
     {
         private readonly ILogger<HardwareControl> _logger;
-        private readonly IHardwareCommunication _hardwareCommunication;
+        private readonly ISpiCommunication _spiCommunication;
 
         private readonly object _lock = new();
         private bool _normalOperationsAllowed;
 
         public HardwareControl(
             ILogger<HardwareControl> logger,
-            IHardwareCommunication hardwareCommunication)
+            ISpiCommunication spiCommunication)
         {
             _logger = logger;
-            _hardwareCommunication = hardwareCommunication;
+            _spiCommunication = spiCommunication;
             _normalOperationsAllowed = true;
         }
 
@@ -36,7 +36,7 @@ namespace Paregov.RobotCar.Rest.Service.Hardware
             lock (_lock)
             {
                 _logger.LogInformation("Sending command: {Command}", command);
-                _hardwareCommunication.SendMessage(command); // Use hardware communicator to send the command
+                _spiCommunication.SendMessage(command); // Use SPI communicator to send the command
 
                 return string.Empty;
             }
@@ -84,45 +84,41 @@ namespace Paregov.RobotCar.Rest.Service.Hardware
         {
             if (!_normalOperationsAllowed)
             {
-                _logger.LogWarning(
-                    "Normal operations are not allowed. Command will not be sent: {CommandData}",
-                    commandData);
+                _logger.LogWarning("Normal operations are not allowed. Command will not be sent: {Command}", commandData);
                 return false;
             }
+
             lock (_lock)
             {
-                var commandBytes = new byte[8];
-                commandBytes[0] = commandData.CommandType; // Command type
-                Array.Copy(
-                    commandData.Data,
-                    0,
-                    commandBytes,
-                    1,
-                    commandData.Data.Length);
-
-                _logger.LogInformation($"Sending 8 byte command: [{string.Join(", ", commandBytes)}]");
-                _hardwareCommunication.SendBytesMessage(commandBytes);
-
-                return true;
+                _logger.LogInformation("Sending 8-byte command: {Command}", commandData);
+                return _spiCommunication.SendBytesMessage(commandData.ToByteArray());
             }
         }
 
         public bool PrepareForFirmwareUpdate()
         {
-            _normalOperationsAllowed = false;
-
-            return true;
+            lock (_lock)
+            {
+                _normalOperationsAllowed = false;
+                _logger.LogInformation("Hardware prepared for firmware update. Normal operations are disabled.");
+                return true;
+            }
         }
 
         public bool ResumeAfterFirmwareUpdate()
         {
-            _normalOperationsAllowed = true;
-
-            return true;
+            lock (_lock)
+            {
+                _normalOperationsAllowed = true;
+                _logger.LogInformation("Hardware resumed after firmware update. Normal operations are enabled.");
+                return true;
+            }
         }
 
         public void Dispose()
         {
+            // SPI communication is managed by DI container
+            _logger.LogInformation("HardwareControl disposed.");
         }
     }
 }
