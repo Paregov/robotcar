@@ -27,7 +27,7 @@ void process_commands_protocol()
         return;
     }
     
-    motor_speed_t motor_speed = {
+    motor_direction_speed_t motor_direction_speed = {
         .direction = (int8_t)command.data[0], // Direction
         .speed = command.data[1], // Speed in percentage (0-100)
         .timeout = (int16_t)((uint16_t)command.data[2] << 8 | command.data[3]) // Timeout in milliseconds
@@ -35,41 +35,41 @@ void process_commands_protocol()
 
     if (LEFT_MOTOR_COMMAND == command.type)
     {
-        set_left_dc_motor_speed(motor_speed);
+        set_left_dc_motor_speed(motor_direction_speed);
     }
 
     if (RIGHT_MOTOR_COMMAND == command.type)
     {
-        set_right_dc_motor_speed(motor_speed);
+        set_right_dc_motor_speed(motor_direction_speed);
     }
 
-    if (BASE_MOTOR_COMMAND == command.type)
+    if (BASE_MOTOR_DIRECTION_COMMAND == command.type)
     {
-        set_base_servo_speed(motor_speed);
+        set_base_servo_speed(motor_direction_speed);
     }
 
-    if (SHOULDER_MOTOR_COMMAND == command.type)
+    if (SHOULDER_MOTOR_DIRECTION_COMMAND == command.type)
     {
-        set_shoulder_servo_speed(motor_speed);
+        set_shoulder_servo_speed(motor_direction_speed);
     }
 
-    if (ELBOW_MOTOR_COMMAND == command.type)
+    if (ELBOW_MOTOR_DIRECTION_COMMAND == command.type)
     {
-        set_elbow_servo_speed(motor_speed);
+        set_elbow_servo_speed(motor_direction_speed);
     }
 
-    if (ARM_MOTOR_COMMAND == command.type)
+    if (ARM_MOTOR_DIRECTION_COMMAND == command.type)
     {
-        set_arm_servo_speed(motor_speed);
+        set_arm_servo_speed(motor_direction_speed);
     }
 
-    if (WRIST_MOTOR_COMMAND == command.type)
+    if (WRIST_MOTOR_DIRECTION_COMMAND == command.type)
     {
-        set_wrist_servo_speed(motor_speed);
+        set_wrist_servo_speed(motor_direction_speed);
     }
 
-    if (GRIPPER_MOTOR_COMMAND == command.type)
+    if (GRIPPER_MOTOR_DIRECTION_COMMAND == command.type)
     {
-        set_gripper_servo_speed(motor_speed);
+        set_gripper_servo_speed(motor_direction_speed);
     }
 }

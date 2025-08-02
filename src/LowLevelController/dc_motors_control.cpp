@@ -17,7 +17,7 @@ const uint LEFT_MOTOR_BACKWARD_PIN = 26;    // IN1
 const uint RIGHT_MOTOR_FORWARD_PIN = 14;    // IN4
 const uint RIGHT_MOTOR_BACKWARD_PIN = 15;   // IN3
 
-motor_speed_t dc_motors_speeds[2] = {
+motor_direction_speed_t dc_motors_speeds[2] = {
     { .direction = 0, .speed = 0, .timeout = 0 }, // Left motor
     { .direction = 0, .speed = 0, .timeout = 0 }  // Right motor
 };
@@ -25,7 +25,7 @@ motor_speed_t dc_motors_speeds[2] = {
 struct repeating_timer dc_motors_control_timer;
 
 void process_dc_motor_speed(
-    motor_speed_t *motor,
+    motor_direction_speed_t *motor,
     uint gpio_forward,
     uint gpio_backward,
     int pwm_index)
@@ -112,8 +112,8 @@ void init_dc_motors()
     gpio_put(RIGHT_MOTOR_BACKWARD_PIN, 0);
 
     set_dc_motors_speed(
-        (motor_speed_t){ .direction = 0, .speed = 0, .timeout = 0 }, // Left motor
-        (motor_speed_t){ .direction = 0, .speed = 0, .timeout = 0 }  // Right motor
+        (motor_direction_speed_t){ .direction = 0, .speed = 0, .timeout = 0 }, // Left motor
+        (motor_direction_speed_t){ .direction = 0, .speed = 0, .timeout = 0 }  // Right motor
     );
     
     // Create a repeating timer that calls dc_motors_timer_callback.
@@ -124,7 +124,7 @@ void init_dc_motors()
     add_repeating_timer_us(-TIMER_INTERVAL_US, dc_motors_timer_callback, NULL, &dc_motors_control_timer);
 }
 
-void set_dc_motors_speed(motor_speed_t left, motor_speed_t right)
+void set_dc_motors_speed(motor_direction_speed_t left, motor_direction_speed_t right)
 {
     uint32_t saved = save_and_disable_interrupts();
     
@@ -134,12 +134,12 @@ void set_dc_motors_speed(motor_speed_t left, motor_speed_t right)
     restore_interrupts(saved);
 }
 
-void set_left_dc_motor_speed(motor_speed_t speed)
+void set_left_dc_motor_speed(motor_direction_speed_t speed)
 {
     dc_motors_speeds[LEFT_MOTOR_INDEX] = speed;
 }
 
-void set_right_dc_motor_speed(motor_speed_t speed)
+void set_right_dc_motor_speed(motor_direction_speed_t speed)
 {
     dc_motors_speeds[RIGHT_MOTOR_INDEX] = speed;
 }

@@ -152,7 +152,7 @@ public class FirmwareUpdater : IFirmwareUpdater
             // Create a new ProcessStartInfo object
             ProcessStartInfo startInfo = new()
             {
-                FileName = "picoboot3", // The command to execute
+                FileName = "/home/pi/.local/bin/picoboot3", // The command to execute
                 Arguments = arguments, // The arguments for the command
                 RedirectStandardOutput = true, // Capture standard output
                 RedirectStandardError = true,  // Capture standard error

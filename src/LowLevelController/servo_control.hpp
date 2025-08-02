@@ -53,11 +53,11 @@ typedef struct
 
 void init_servos();
 void set_servo_position_in_degrees(uint8_t servo, int16_t degrees);
-void set_base_servo_speed(motor_speed_t speed);
-void set_shoulder_servo_speed(motor_speed_t speed);
-void set_elbow_servo_speed(motor_speed_t speed);
-void set_arm_servo_speed(motor_speed_t speed);
-void set_wrist_servo_speed(motor_speed_t speed);
-void set_gripper_servo_speed(motor_speed_t speed);
+void set_base_servo_speed(motor_direction_speed_t speed);
+void set_shoulder_servo_speed(motor_direction_speed_t speed);
+void set_elbow_servo_speed(motor_direction_speed_t speed);
+void set_arm_servo_speed(motor_direction_speed_t speed);
+void set_wrist_servo_speed(motor_direction_speed_t speed);
+void set_gripper_servo_speed(motor_direction_speed_t speed);
 
-bool set_servo_motor_speed(uint8_t servo, motor_speed_t speed);
+bool set_servo_motor_direction_speed(uint8_t servo, motor_direction_speed_t speed);

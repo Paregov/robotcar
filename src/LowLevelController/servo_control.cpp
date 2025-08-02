@@ -12,12 +12,33 @@
 
 #define SERVO_SPEED_TABLE_SIZE 10
 
+// Internal type used to represent the internal state of the servo motor and the current control settings.
+typedef struct
+{
+    // Type of control (direction or position).
+    servo_control_type_t control_type;
+
+    // Direction of the motor: 1 for forward, -1 for backward.
+    int8_t direction;
+
+    // Speed in percentage.
+    uint8_t speed;
+
+    // Elapsed time in milliseconds since the last update.
+    int16_t elapsed_time;
+
+    // Timeout in milliseconds when to stop the servo.
+    int16_t timeout;
+} servo_motor_state_t;
+
+// Represents the speed settings for each servo motor.
 typedef struct {
     uint8_t min_percentage; // Minimum speed percentage.
     uint8_t max_percentage; // Maximum speed percentage.
     uint16_t min_time_ms;   // Minimum time in milliseconds before change degrees.
 } servo_speed_settings_t;
 
+// Default servo configuration for 180 degrees servo.
 const servo_info_t servo_180 = {
     .degrees = 180,
     .bottom_degrees_limit = 0,
@@ -30,6 +51,7 @@ const servo_info_t servo_180 = {
     .is_inverted = false
 };
 
+// Default servo configuration for 270 degrees servo.
 const servo_info_t servo_270 = {
     .degrees = 270,
     .bottom_degrees_limit = 0,
@@ -42,6 +64,8 @@ const servo_info_t servo_270 = {
     .is_inverted = false
 };
 
+// Speed settings for each servo motor.
+// Used to determine how fast the servo should move based on the speed percentage and elapsed time.
 const servo_speed_settings_t servos_speed_table[SERVOS_COUNT][SERVO_SPEED_TABLE_SIZE] = {
     {   // Base servo speed settings
         { .min_percentage = 10, .max_percentage = 20, .min_time_ms = 110 },
@@ -141,9 +165,10 @@ const servo_speed_settings_t servos_speed_table[SERVOS_COUNT][SERVO_SPEED_TABLE_
     }
 };
 
+// Array to hold servo information for each servo motor.
 servo_info_t servos_info_array[SERVOS_COUNT];
 
-motor_speed_t servo_motor_speeds_array[SERVOS_COUNT] = {
+motor_direction_speed_t servo_motor_speeds_array[SERVOS_COUNT] = {
     { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
     { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
     { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 },
@@ -154,8 +179,10 @@ motor_speed_t servo_motor_speeds_array[SERVOS_COUNT] = {
     { .direction = 0, .speed = 0, .elapsed_time = 0, .timeout = 0 }
 };
 
+// Timer to handle servo control updates.
 struct repeating_timer servo_control_timer;
 
+// Function to determine if a servo should move based on its speed settings.
 bool should_servo_move(
     servo_speed_settings_t *settings,
     uint8_t speed_percentage,
@@ -176,7 +203,7 @@ bool should_servo_move(
     return false;
 }
 
-void process_servo_motor_speed(motor_speed_t *motor, uint8_t motor_index)
+void process_servo_motor_speed(motor_direction_speed_t *motor, uint8_t motor_index)
 {
     motor->timeout -= TIMER_INTERVAL_MS;
     if (motor->timeout <= 0)
@@ -247,8 +274,6 @@ bool servo_motors_timer_callback(struct repeating_timer *t)
     process_servo_motor_speed(&servo_motor_speeds_array[WRIST_MOTOR_INDEX], WRIST_MOTOR_INDEX);
     process_servo_motor_speed(&servo_motor_speeds_array[GRIPPER_MOTOR_INDEX], GRIPPER_MOTOR_INDEX);
 
-    // In here we are going to process the servo motor position updates as well.
-
     return true; // Keep the timer repeating
 }
 
@@ -295,8 +320,15 @@ void init_servos()
     servos_info_array[7] = servo_270;
     servos_info_array[7].pwm_number = 7;
     
-    // Intentionaly I am not setting the degrees in the initialization.
-    // The degrees will be set when the robot arm is initialized from the main controller.
+    set_servo_position_in_degrees(0, servos_info_array[0].degrees/2); // base
+    set_servo_position_in_degrees(1, servos_info_array[1].degrees/2); // shoulder
+    set_servo_position_in_degrees(2, servos_info_array[2].degrees/2); // elbow
+    set_servo_position_in_degrees(3, servos_info_array[3].degrees/2); // arm
+    set_servo_position_in_degrees(4, servos_info_array[4].degrees/2); // wrist
+    // set_servo_position_in_degrees(5, servos[5].degrees/2); // wrist2 - Not present in this Robot Arm
+    set_servo_position_in_degrees(6, servos_info_array[6].degrees/2); // gripper
+    // set_servo_position_in_degrees(7, servos[7].degrees/2); // - Not present in this Robot Arm
+
 
     // Create a repeating timer that calls servo_motors_timer_callback.
     // The first argument is the interval in microseconds.
@@ -338,37 +370,37 @@ void set_servo_position_in_degrees(uint8_t servo, int16_t degrees)
     set_pwm_pulse_width_us(servos_info_array[servo].pwm_number, (uint16_t)pulse_width);
 }
 
-void set_base_servo_speed(motor_speed_t speed)
+void set_base_servo_speed(motor_direction_speed_t speed)
 {
     servo_motor_speeds_array[BASE_MOTOR_INDEX] = speed;
 }
 
-void set_shoulder_servo_speed(motor_speed_t speed)
+void set_shoulder_servo_speed(motor_direction_speed_t speed)
 {
     servo_motor_speeds_array[SHOULDER_MOTOR_INDEX] = speed;
 }
 
-void set_elbow_servo_speed(motor_speed_t speed)
+void set_elbow_servo_speed(motor_direction_speed_t speed)
 {
     servo_motor_speeds_array[ELBOW_MOTOR_INDEX] = speed;
 }
 
-void set_arm_servo_speed(motor_speed_t speed)
+void set_arm_servo_speed(motor_direction_speed_t speed)
 {
     servo_motor_speeds_array[ARM_MOTOR_INDEX] = speed;
 }
 
-void set_wrist_servo_speed(motor_speed_t speed)
+void set_wrist_servo_speed(motor_direction_speed_t speed)
 {
     servo_motor_speeds_array[WRIST_MOTOR_INDEX] = speed;
 }
 
-void set_gripper_servo_speed(motor_speed_t speed)
+void set_gripper_servo_speed(motor_direction_speed_t speed)
 {
     servo_motor_speeds_array[GRIPPER_MOTOR_INDEX] = speed;
 }
 
-bool set_servo_motor_speed(uint8_t servo, motor_speed_t speed)
+bool set_servo_motor_direction_speed(uint8_t servo, motor_direction_speed_t speed)
 {
     if (servo >= SERVOS_COUNT)
     {

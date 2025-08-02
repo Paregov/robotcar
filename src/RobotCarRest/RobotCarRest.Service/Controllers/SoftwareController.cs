@@ -37,32 +37,168 @@ public class SoftwareController : ControllerBase
         [FromQuery] string? updateInterface = null,
         CancellationToken cancellationToken = default)
     {
-        var contentLength = Request.ContentLength;
-        using var memoryStream = new MemoryStream();
-        await Request.Body.CopyToAsync(memoryStream, cancellationToken);
-
-        // Convert the memory stream to a byte array.
-        var firmware = memoryStream.ToArray();
-
-        if (firmware.Length == 0 || firmware.Length != contentLength)
+        try
         {
-            _logger.LogError("Firmware data is null or empty.");
-            return BadRequest(new CommandResponse { IsSuccess = false });
+            _logger.LogInformation("Received firmware update request.");
+
+            var contentLength = Request.ContentLength;
+
+            // Validate content length
+            if (contentLength == null || contentLength <= 0)
+            {
+                const string errorMessage = "Invalid content length. No firmware data provided.";
+                _logger.LogError(errorMessage);
+                return BadRequest(new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = $"Content-Length header: {contentLength}"
+                });
+            }
+
+            using var memoryStream = new MemoryStream();
+
+            try
+            {
+                await Request.Body.CopyToAsync(memoryStream, cancellationToken);
+            }
+            catch (OperationCanceledException ex)
+            {
+                const string errorMessage = "Firmware upload was cancelled.";
+                _logger.LogError(ex, errorMessage);
+                return BadRequest(new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = ex.Message
+                });
+            }
+            catch (IOException ex)
+            {
+                const string errorMessage = "Failed to read firmware data from request body.";
+                _logger.LogError(ex, errorMessage);
+                return BadRequest(new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = ex.Message
+                });
+            }
+
+            // Convert the memory stream to a byte array.
+            var firmware = memoryStream.ToArray();
+
+            if (firmware.Length == 0 || firmware.Length != contentLength)
+            {
+                var errorMessage = $"Firmware data validation failed. Expected {contentLength} bytes, received {firmware.Length} bytes.";
+                _logger.LogError(errorMessage);
+                return BadRequest(new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "Firmware data validation failed.",
+                    ErrorDetails = errorMessage
+                });
+            }
+
+            // Parse the interface parameter, default to UART if not specified or invalid
+            FirmwareUpdateInterface selectedInterface;
+            try
+            {
+                selectedInterface = ParseUpdateInterface(updateInterface);
+            }
+            catch (Exception ex)
+            {
+                const string errorMessage = "Failed to parse update interface parameter.";
+                _logger.LogError(ex, errorMessage);
+                return BadRequest(new CommandResponse 
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = $"Interface: '{updateInterface}', Error: {ex.Message}"
+                });
+            }
+
+            _logger.LogInformation("Firmware update requested using {SelectedInterface} interface with {FirmwareSize} bytes.",
+                selectedInterface, firmware.Length);
+
+            // Perform the firmware update
+            bool result;
+            try
+            {
+                result = _firmwareUploader.UpdateLowLevelController(firmware, selectedInterface);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                const string errorMessage = "Insufficient permissions to perform firmware update.";
+                _logger.LogError(ex, errorMessage);
+                return StatusCode(500, new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = $"This operation may require elevated privileges. Details: {ex.Message}"
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                const string errorMessage = "Firmware update operation is not valid in the current state.";
+                _logger.LogError(ex, errorMessage);
+                return StatusCode(500, new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = ex.Message
+                });
+            }
+            catch (TimeoutException ex)
+            {
+                const string errorMessage = "Firmware update operation timed out.";
+                _logger.LogError(ex, errorMessage);
+                return StatusCode(500, new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Unexpected error during firmware update using {selectedInterface} interface.";
+                _logger.LogError(ex, errorMessage);
+                return StatusCode(500, new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}"
+                });
+            }
+
+            if (!result)
+            {
+                var errorMessage = $"Firmware update failed using {selectedInterface} interface. The update process completed but was not successful.";
+                _logger.LogError(errorMessage);
+                return StatusCode(500, new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "Firmware update process failed.",
+                    ErrorDetails = errorMessage
+                });
+            }
+
+            _logger.LogInformation("Firmware update completed successfully using {SelectedInterface} interface.", selectedInterface);
+            return Ok(new CommandResponse { IsSuccess = true });
         }
-
-        // Parse the interface parameter, default to UART if not specified or invalid
-        var selectedInterface = ParseUpdateInterface(updateInterface);
-
-        _logger.LogInformation($"Firmware update requested using {selectedInterface} interface.");
-
-        var result = _firmwareUploader.UpdateLowLevelController(firmware, selectedInterface);
-        if (!result)
+        catch (Exception ex)
         {
-            _logger.LogError($"Failed to update low level controller firmware using {selectedInterface} interface.");
-            return StatusCode(500, new CommandResponse { IsSuccess = false });
+            // Catch-all for any unexpected exceptions
+            const string errorMessage = "An unexpected error occurred during firmware update.";
+            _logger.LogError(ex, errorMessage);
+            return StatusCode(500, new CommandResponse
+            {
+                IsSuccess = false,
+                ErrorMessage = errorMessage,
+                ErrorDetails = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}, StackTrace: {ex.StackTrace}"
+            });
         }
-
-        return Ok(new CommandResponse());
     }
 
     [ApiVersion("1.0")]
@@ -71,27 +207,127 @@ public class SoftwareController : ControllerBase
     public async Task<ActionResult<CommandResponse>> UpdateRestServerAsync(
         CancellationToken cancellationToken = default)
     {
-        var contentLength = Request.ContentLength;
-        using var memoryStream = new MemoryStream();
-        await Request.Body.CopyToAsync(memoryStream, cancellationToken);
-
-        // Convert the memory stream to a byte array.
-        var restServer = memoryStream.ToArray();
-
-        if (restServer.Length == 0 || restServer.Length != contentLength)
+        try
         {
-            _logger.LogError("REST server data is null or empty.");
-            return BadRequest(new CommandResponse { IsSuccess = false });
-        }
+            _logger.LogInformation("Received REST server update request.");
 
-        _restUpdater.UpdateRestSoftware(restServer, "1.0");
+            var contentLength = Request.ContentLength;
 
-        // We don't want to block the response waiting for the server to exit,
+            // Validate content length
+            if (contentLength == null || contentLength <= 0)
+            {
+                const string errorMessage = "Invalid content length. No REST server data provided.";
+                _logger.LogError(errorMessage);
+                return BadRequest(new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = $"Content-Length header: {contentLength}"
+                });
+            }
+
+            using var memoryStream = new MemoryStream();
+
+            try
+            {
+                await Request.Body.CopyToAsync(memoryStream, cancellationToken);
+            }
+            catch (OperationCanceledException ex)
+            {
+                const string errorMessage = "REST server upload was cancelled.";
+                _logger.LogError(ex, errorMessage);
+                return BadRequest(new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = ex.Message
+                });
+            }
+            catch (IOException ex)
+            {
+                const string errorMessage = "Failed to read REST server data from request body.";
+                _logger.LogError(ex, errorMessage);
+                return BadRequest(new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = ex.Message
+                });
+            }
+
+            // Convert the memory stream to a byte array.
+            var restServer = memoryStream.ToArray();
+
+            if (restServer.Length == 0 || restServer.Length != contentLength)
+            {
+                var errorMessage = $"REST server data validation failed. Expected {contentLength} bytes, received {restServer.Length} bytes.";
+                _logger.LogError(errorMessage);
+                return BadRequest(new CommandResponse
+                {
+                    IsSuccess = false, 
+                    ErrorMessage = "REST server data validation failed.",
+                    ErrorDetails = errorMessage
+                });
+            }
+
+            try
+            {
+                _restUpdater.UpdateRestSoftware(restServer, "1.0");
+                _logger.LogInformation("REST server update initiated successfully with {DataSize} bytes.", restServer.Length);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                const string errorMessage = "Insufficient permissions to perform REST server update.";
+                _logger.LogError(ex, errorMessage);
+                return StatusCode(500, new CommandResponse
+                {
+                    IsSuccess = false, 
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = $"This operation may require elevated privileges. Details: {ex.Message}"
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                const string errorMessage = "REST server update operation is not valid in the current state.";
+                _logger.LogError(ex, errorMessage);
+                return StatusCode(500, new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                const string errorMessage = "Unexpected error during REST server update.";
+                _logger.LogError(ex, errorMessage);
+                return StatusCode(500, new CommandResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorMessage,
+                    ErrorDetails = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}"
+                });
+            }
+
+            // We don't want to block the response waiting for the server to exit,
 #pragma warning disable CS4014
-        ExitRestServerAsync();
+            ExitRestServerAsync();
 #pragma warning restore CS4014
 
-        return Ok(new CommandResponse());
+            return Ok(new CommandResponse { IsSuccess = true });
+        }
+        catch (Exception ex)
+        {
+            // Catch-all for any unexpected exceptions
+            const string errorMessage = "An unexpected error occurred during REST server update.";
+            _logger.LogError(ex, errorMessage);
+            return StatusCode(500, new CommandResponse
+            {
+                IsSuccess = false,
+                ErrorMessage = errorMessage,
+                ErrorDetails = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}, StackTrace: {ex.StackTrace}"
+            });
+        }
     }
 
     /// <summary>

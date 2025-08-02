@@ -43,6 +43,7 @@ x64/
 *.log
 *.svclog
 *.scc
+RobotCarRest.Service.zip
 
 # Visual C++ cache files
 ipch/
