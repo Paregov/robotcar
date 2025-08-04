@@ -85,13 +85,8 @@ namespace Paregov.RobotCar.Rest.Service
             });
 
             // Register independent communication services
-            builder.Services.AddSingleton<SpiCommunication>();
-            builder.Services.AddSingleton<ISpiCommunication>(serviceProvider =>
-                serviceProvider.GetRequiredService<SpiCommunication>());
-
-            builder.Services.AddSingleton<UartCommunication>();
-            builder.Services.AddSingleton<IUartCommunication>(serviceProvider =>
-                serviceProvider.GetRequiredService<UartCommunication>());
+            builder.Services.AddSingleton<ISpiCommunication, SpiCommunication>();
+            builder.Services.AddSingleton<IUartCommunication, UartCommunication>();
 
             // Register other services
             builder.Services.AddSingleton<IServos, Servos>();
@@ -100,7 +95,7 @@ namespace Paregov.RobotCar.Rest.Service
             builder.Services.AddSingleton<IFirmwareUpdater, FirmwareUpdater>();
             builder.Services.AddSingleton<IRestUpdater, RestUpdater>();
             builder.Services.AddSingleton<IMotorSpeed, MotorSpeed>();
-            
+
             // Register the background worker service
             builder.Services.AddHostedService<RobotCarWorker>();
 
@@ -120,12 +115,9 @@ namespace Paregov.RobotCar.Rest.Service
             try
             {
                 var spiComm = app.Services.GetRequiredService<ISpiCommunication>();
-                var uartComm = app.Services.GetRequiredService<IUartCommunication>();
 
                 logger.LogInformation("Independent communication services initialized:");
                 logger.LogInformation("  - SPI Communication: {Status}", spiComm.IsChannelReady ? "Ready" : "Not Ready");
-                logger.LogInformation("  - UART Communication: {Status}", uartComm.IsChannelReady ? "Ready" : "Not Ready");
-                logger.LogInformation("  - SSD1306 Display: Uses I2cDevice directly (initialized in RobotCarWorker)");
             }
             catch (Exception ex)
             {

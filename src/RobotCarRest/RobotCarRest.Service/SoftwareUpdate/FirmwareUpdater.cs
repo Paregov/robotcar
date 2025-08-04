@@ -31,7 +31,7 @@ public class FirmwareUpdater : IFirmwareUpdater
         _firmwarePath = Path.Join(AppContext.BaseDirectory, "firmware/LowLevelController.bin");
     }
 
-    public bool UpdateLowLevelController(
+    public (bool, string) UpdateLowLevelController(
         byte[]? firmwareData,
         FirmwareUpdateInterface updateInterface = FirmwareUpdateInterface.Uart)
     {
@@ -54,10 +54,10 @@ public class FirmwareUpdater : IFirmwareUpdater
         }
 
         _logger.LogError("Failed to write firmware data to file. Update process aborted.");
-        return false;
+        return (false, "Failed to write firmware data to file. Update process aborted.");
     }
 
-    private bool RunUpdateProcess(FirmwareUpdateInterface updateInterface = FirmwareUpdateInterface.Uart)
+    private (bool, string) RunUpdateProcess(FirmwareUpdateInterface updateInterface = FirmwareUpdateInterface.Uart)
     {
         var _gpioController = new GpioController();
 
@@ -77,8 +77,9 @@ public class FirmwareUpdater : IFirmwareUpdater
         Thread.Sleep(1000); // 1000 milliseconds = 1 second
         _logger.LogInformation("Start the controller again (set RUN_CTRL_PIN to HIGH).");
         _gpioController.Write(RUN_CTRL_PIN, PinValue.High);
+        Thread.Sleep(5);
 
-        bool result = updateInterface switch
+        var result = updateInterface switch
         {
             FirmwareUpdateInterface.Spi => UpdateSpi(),
             FirmwareUpdateInterface.Uart => UpdateUart(),
@@ -118,7 +119,7 @@ public class FirmwareUpdater : IFirmwareUpdater
     /// <summary>
     /// Executes the picoboot3 command for UART firmware update.
     /// </summary>
-    private bool UpdateUart()
+    private (bool, string) UpdateUart()
     {
         _logger.LogInformation("\nStarting UART firmware update...");
 
@@ -131,7 +132,7 @@ public class FirmwareUpdater : IFirmwareUpdater
     /// <summary>
     /// Executes the picoboot3 command for SPI firmware update.
     /// </summary>
-    private bool UpdateSpi()
+    private (bool, string) UpdateSpi()
     {
         _logger.LogInformation("\nStarting SPI firmware update...");
 
@@ -145,7 +146,7 @@ public class FirmwareUpdater : IFirmwareUpdater
     /// Helper method to execute the picoboot3 command.
     /// </summary>
     /// <param name="arguments">The arguments string to pass to picoboot3.</param>
-    private bool ExecutePicoboot3(string arguments)
+    private (bool, string) ExecutePicoboot3(string arguments)
     {
         try
         {
@@ -171,6 +172,8 @@ public class FirmwareUpdater : IFirmwareUpdater
 
             process.WaitForExit(); // Wait for the process to complete
 
+            var completeMessage = $"\r\n\r\nstdout: {stdout}\r\n\r\nstderr: {stderr}";
+
             _logger.LogInformation("\n--- picoboot3 Stdout ---");
             _logger.LogInformation(stdout);
             _logger.LogInformation("\n--- picoboot3 Stderr ---");
@@ -180,27 +183,25 @@ public class FirmwareUpdater : IFirmwareUpdater
             {
                 _logger.LogInformation("picoboot3 command executed successfully.");
 
-                return true; // Indicate success if the exit code is zero
+                return (true, completeMessage); // Indicate success if the exit code is zero
             }
-            else
-            {
-                _logger.LogInformation($"Error calling picoboot3. Exit Code: {process.ExitCode}");
 
-                return false; // Indicate failure if the exit code is not zero
-            }
+            _logger.LogInformation($"Error calling picoboot3. Exit Code: {process.ExitCode}");
+
+            // Indicate failure if the exit code is not zero
+            return (false, completeMessage);
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException fnfe)
         {
-            _logger.LogInformation("Error: 'picoboot3' command not found. Make sure it's installed and in your system's PATH.");
+            _logger.LogError(fnfe, "Error: 'picoboot3' command not found. Make sure it's installed and in your system's PATH.");
 
-            return false; // Indicate failure if the command is not found
+            return (false, fnfe.Message); // Indicate failure if the command is not found
         }
         catch (Exception ex)
         {
-            _logger.LogInformation($"An unexpected error occurred: {ex.Message}");
-            _logger.LogInformation(ex.StackTrace);
+            _logger.LogError(ex, $"An unexpected error occurred: {ex.Message}");
 
-            return false; // Indicate failure for any other exceptions
+            return (false, ex.Message); // Indicate failure for any other exceptions
         }
     }
 }

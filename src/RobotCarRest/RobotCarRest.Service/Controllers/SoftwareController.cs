@@ -51,8 +51,8 @@ public class SoftwareController : ControllerBase
                 return BadRequest(new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = $"Content-Length header: {contentLength}"
+                    Message = errorMessage,
+                    Details = $"Content-Length header: {contentLength}"
                 });
             }
 
@@ -69,8 +69,8 @@ public class SoftwareController : ControllerBase
                 return BadRequest(new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = ex.Message
+                    Message = errorMessage,
+                    Details = ex.Message
                 });
             }
             catch (IOException ex)
@@ -80,8 +80,8 @@ public class SoftwareController : ControllerBase
                 return BadRequest(new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = ex.Message
+                    Message = errorMessage,
+                    Details = ex.Message
                 });
             }
 
@@ -95,8 +95,8 @@ public class SoftwareController : ControllerBase
                 return BadRequest(new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = "Firmware data validation failed.",
-                    ErrorDetails = errorMessage
+                    Message = "Firmware data validation failed.",
+                    Details = errorMessage
                 });
             }
 
@@ -113,8 +113,8 @@ public class SoftwareController : ControllerBase
                 return BadRequest(new CommandResponse 
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = $"Interface: '{updateInterface}', Error: {ex.Message}"
+                    Message = errorMessage,
+                    Details = $"Interface: '{updateInterface}', Error: {ex.Message}"
                 });
             }
 
@@ -122,7 +122,7 @@ public class SoftwareController : ControllerBase
                 selectedInterface, firmware.Length);
 
             // Perform the firmware update
-            bool result;
+            (bool, string) result;
             try
             {
                 result = _firmwareUploader.UpdateLowLevelController(firmware, selectedInterface);
@@ -134,8 +134,8 @@ public class SoftwareController : ControllerBase
                 return StatusCode(500, new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = $"This operation may require elevated privileges. Details: {ex.Message}"
+                    Message = errorMessage,
+                    Details = $"This operation may require elevated privileges. Details: {ex.Message}"
                 });
             }
             catch (InvalidOperationException ex)
@@ -145,8 +145,8 @@ public class SoftwareController : ControllerBase
                 return StatusCode(500, new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = ex.Message
+                    Message = errorMessage,
+                    Details = ex.Message
                 });
             }
             catch (TimeoutException ex)
@@ -156,8 +156,8 @@ public class SoftwareController : ControllerBase
                 return StatusCode(500, new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = ex.Message
+                    Message = errorMessage,
+                    Details = ex.Message
                 });
             }
             catch (Exception ex)
@@ -167,25 +167,31 @@ public class SoftwareController : ControllerBase
                 return StatusCode(500, new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}"
+                    Message = errorMessage,
+                    Details = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}"
                 });
             }
 
-            if (!result)
+            if (!result.Item1)
             {
-                var errorMessage = $"Firmware update failed using {selectedInterface} interface. The update process completed but was not successful.";
+                var errorMessage = $"Firmware update failed using {selectedInterface} interface. The update process completed but was not successful. {result.Item2}";
                 _logger.LogError(errorMessage);
                 return StatusCode(500, new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = "Firmware update process failed.",
-                    ErrorDetails = errorMessage
+                    Message = "Firmware update process failed.",
+                    Details = errorMessage
                 });
             }
 
             _logger.LogInformation("Firmware update completed successfully using {SelectedInterface} interface.", selectedInterface);
-            return Ok(new CommandResponse { IsSuccess = true });
+            return Ok(
+                new CommandResponse
+                {
+                    IsSuccess = true,
+                    Message = "Firmware update process completed successfully.",
+                    Details = result.Item2
+                });
         }
         catch (Exception ex)
         {
@@ -195,8 +201,8 @@ public class SoftwareController : ControllerBase
             return StatusCode(500, new CommandResponse
             {
                 IsSuccess = false,
-                ErrorMessage = errorMessage,
-                ErrorDetails = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}, StackTrace: {ex.StackTrace}"
+                Message = errorMessage,
+                Details = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}, StackTrace: {ex.StackTrace}"
             });
         }
     }
@@ -221,8 +227,8 @@ public class SoftwareController : ControllerBase
                 return BadRequest(new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = $"Content-Length header: {contentLength}"
+                    Message = errorMessage,
+                    Details = $"Content-Length header: {contentLength}"
                 });
             }
 
@@ -239,8 +245,8 @@ public class SoftwareController : ControllerBase
                 return BadRequest(new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = ex.Message
+                    Message = errorMessage,
+                    Details = ex.Message
                 });
             }
             catch (IOException ex)
@@ -250,8 +256,8 @@ public class SoftwareController : ControllerBase
                 return BadRequest(new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = ex.Message
+                    Message = errorMessage,
+                    Details = ex.Message
                 });
             }
 
@@ -265,8 +271,8 @@ public class SoftwareController : ControllerBase
                 return BadRequest(new CommandResponse
                 {
                     IsSuccess = false, 
-                    ErrorMessage = "REST server data validation failed.",
-                    ErrorDetails = errorMessage
+                    Message = "REST server data validation failed.",
+                    Details = errorMessage
                 });
             }
 
@@ -282,8 +288,8 @@ public class SoftwareController : ControllerBase
                 return StatusCode(500, new CommandResponse
                 {
                     IsSuccess = false, 
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = $"This operation may require elevated privileges. Details: {ex.Message}"
+                    Message = errorMessage,
+                    Details = $"This operation may require elevated privileges. Details: {ex.Message}"
                 });
             }
             catch (InvalidOperationException ex)
@@ -293,8 +299,8 @@ public class SoftwareController : ControllerBase
                 return StatusCode(500, new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = ex.Message
+                    Message = errorMessage,
+                    Details = ex.Message
                 });
             }
             catch (Exception ex)
@@ -304,8 +310,8 @@ public class SoftwareController : ControllerBase
                 return StatusCode(500, new CommandResponse
                 {
                     IsSuccess = false,
-                    ErrorMessage = errorMessage,
-                    ErrorDetails = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}"
+                    Message = errorMessage,
+                    Details = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}"
                 });
             }
 
@@ -324,8 +330,8 @@ public class SoftwareController : ControllerBase
             return StatusCode(500, new CommandResponse
             {
                 IsSuccess = false,
-                ErrorMessage = errorMessage,
-                ErrorDetails = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}, StackTrace: {ex.StackTrace}"
+                Message = errorMessage,
+                Details = $"Exception Type: {ex.GetType().Name}, Message: {ex.Message}, StackTrace: {ex.StackTrace}"
             });
         }
     }

@@ -11,7 +11,7 @@ namespace Paregov.RobotCar.Rest.Service.SoftwareUpdate
         /// UART communication interface (default)
         /// </summary>
         Uart = 0,
-        
+
         /// <summary>
         /// SPI communication interface
         /// </summary>
