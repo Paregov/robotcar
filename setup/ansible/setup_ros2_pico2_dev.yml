@@ -1,0 +1,166 @@
+---
+- name: Setup ROS 2 Jazzy and Pico 2 (RP2350) Development Workstation
+  hosts: localhost
+  connection: local
+  become: yes
+
+  vars:
+    ros_distro: "jazzy"
+    pico_chip_target: "rp2350"  # <-- Updated for Pico 2
+    username: "{{ ansible_user_id }}"
+    user_home: "{{ ansible_env.HOME }}"
+    pico_sdk_path: "{{ user_home }}/pico"
+    microros_ws_path: "{{ user_home }}/microros_ws"
+
+  tasks:
+    - name: Print Target User and Chip Information
+      ansible.builtin.debug:
+        msg: "Setting up for user '{{ username }}' | Targeting chip '{{ pico_chip_target }}'"
+
+    # --------------------------------------------------------------------------
+    # SECTION 1: System Prerequisites & Common Dev Tools
+    # --------------------------------------------------------------------------
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install common development tools
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - cmake
+          - git
+          - curl
+          - wget
+          - python3-pip
+          - python3-venv
+          - software-properties-common
+          - gnupg
+          - lsb-release
+        state: present
+
+    # --------------------------------------------------------------------------
+    # SECTION 2: Install ROS 2 Jazzy Jalisco
+    # --------------------------------------------------------------------------
+    - name: Add ROS 2 apt repository GPG key
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/ros/rosdistro/master/ros.key
+        dest: /usr/share/keyrings/ros-archive-keyring.gpg
+        mode: '0644'
+        force: yes
+
+    - name: Add ROS 2 repository to sources list
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu {{ ansible_distribution_release }} main"
+        state: present
+        filename: ros2
+
+    - name: Update apt cache after adding ROS 2 repo
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install ROS 2 Jazzy Desktop Full and Dev Tools
+      ansible.builtin.apt:
+        name:
+          - "ros-{{ ros_distro }}-desktop-full"
+          - "ros-dev-tools"
+        state: present
+
+    - name: Source ROS 2 setup in .bashrc for the user
+      become: no
+      ansible.builtin.lineinfile:
+        path: "{{ user_home }}/.bashrc"
+        line: "source /opt/ros/{{ ros_distro }}/setup.bash"
+        create: yes
+        mode: '0644'
+        state: present
+        regexp: "^source /opt/ros/{{ ros_distro }}/setup.bash$"
+
+    # --------------------------------------------------------------------------
+    # SECTION 3: Install Raspberry Pi Pico SDK
+    # --------------------------------------------------------------------------
+    - name: Install Pico SDK dependencies
+      ansible.builtin.apt:
+        name:
+          - gcc-arm-none-eabi
+          - libnewlib-arm-none-eabi
+          - libstdc++-arm-none-eabi-newlib
+        state: present
+
+    - name: Create Pico SDK directory
+      become: no
+      ansible.builtin.file:
+        path: "{{ pico_sdk_path }}"
+        state: directory
+        mode: '0755'
+
+    - name: Clone Raspberry Pi Pico SDK (latest master for RP2350 support)
+      become: no
+      ansible.builtin.git:
+        repo: 'https://github.com/raspberrypi/pico-sdk.git'
+        dest: "{{ pico_sdk_path }}"
+        branch: master
+        update: yes
+
+    - name: Initialize Pico SDK submodules
+      become: no
+      ansible.builtin.shell:
+        cmd: "git submodule update --init"
+        chdir: "{{ pico_sdk_path }}"
+      args:
+        creates: "{{ pico_sdk_path }}/lib/tinyusb/tinyusb.h"
+
+    - name: Set PICO_SDK_PATH in .bashrc for the user
+      become: no
+      ansible.builtin.lineinfile:
+        path: "{{ user_home }}/.bashrc"
+        line: "export PICO_SDK_PATH={{ pico_sdk_path }}"
+        create: yes
+        mode: '0644'
+        state: present
+        regexp: "^export PICO_SDK_PATH="
+
+    # --------------------------------------------------------------------------
+    # SECTION 4: Install micro-ROS Build System for RP2350
+    # --------------------------------------------------------------------------
+    - name: Install micro-ROS setup tool dependencies via pip
+      ansible.builtin.pip:
+        name:
+          - vcstool
+          - colcon-common-extensions
+        executable: pip3
+
+    - name: Create micro-ROS workspace directory
+      become: no
+      ansible.builtin.file:
+        path: "{{ microros_ws_path }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download and extract micro-ROS setup scripts
+      become: no
+      ansible.builtin.unarchive:
+        src: https://raw.githubusercontent.com/micro-ROS/micro_ros_setup/jazzy/micro_ros_setup.zip
+        dest: "{{ microros_ws_path }}"
+        remote_src: yes
+      args:
+        creates: "{{ microros_ws_path }}/micro_ros_setup"
+
+    # === THIS IS THE MODIFIED TASK FOR PICO 2 (RP2350) ===
+    - name: Create the micro-ROS firmware workspace for {{ pico_chip_target }}
+      become: no
+      ansible.builtin.shell: |
+        source /opt/ros/{{ ros_distro }}/setup.bash
+        ros2 run micro_ros_setup create_firmware_ws.sh freertos {{ pico_chip_target }}
+      args:
+        chdir: "{{ microros_ws_path }}/micro_ros_setup"
+        creates: "{{ microros_ws_path }}/firmware"
+
+    - name: Build the base micro-ROS firmware
+      become: no
+      ansible.builtin.shell: |
+        source /opt/ros/{{ ros_distro }}/setup.bash
+        ros2 run micro_ros_setup build_firmware.sh
+      args:
+        chdir: "{{ microros_ws_path }}/micro_ros_setup"
