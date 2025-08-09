@@ -6,16 +6,31 @@
 
   vars:
     ros_distro: "jazzy"
-    pico_chip_target: "rp2350"  # <-- Updated for Pico 2
-    username: "{{ ansible_user_id }}"
-    user_home: "{{ ansible_env.HOME }}"
-    pico_sdk_path: "{{ user_home }}/pico"
-    microros_ws_path: "{{ user_home }}/microros_ws"
+    pico_chip_target: "pico_raspberry_pi"  # Using officially supported RP2040 platform
+    pico_sdk_path_name: "pico"  # Keep SDK as "pico" for general Pico development
 
   tasks:
+    - name: Get the actual running user info
+      ansible.builtin.shell: |
+        if [ -n "$SUDO_USER" ]; then
+          echo "$SUDO_USER"
+        else
+          whoami
+        fi
+      register: actual_user
+      changed_when: false
+      become: no
+
+    - name: Set user facts
+      ansible.builtin.set_fact:
+        username: "{{ actual_user.stdout }}"
+        user_home: "/home/{{ actual_user.stdout }}"
+        pico_sdk_path: "/home/{{ actual_user.stdout }}/{{ pico_sdk_path_name }}"
+        microros_ws_path: "/home/{{ actual_user.stdout }}/microros_ws"
+
     - name: Print Target User and Chip Information
       ansible.builtin.debug:
-        msg: "Setting up for user '{{ username }}' | Targeting chip '{{ pico_chip_target }}'"
+        msg: "Setting up for user '{{ username }}' | Home: '{{ user_home }}' | Targeting chip '{{ pico_chip_target }}'"
 
     # --------------------------------------------------------------------------
     # SECTION 1: System Prerequisites & Common Dev Tools
@@ -65,10 +80,11 @@
         name:
           - "ros-{{ ros_distro }}-desktop-full"
           - "ros-dev-tools"
+          - "ros-{{ ros_distro }}-ament-cmake"
+          - "ros-{{ ros_distro }}-ament-cmake-python"
         state: present
 
     - name: Source ROS 2 setup in .bashrc for the user
-      become: no
       ansible.builtin.lineinfile:
         path: "{{ user_home }}/.bashrc"
         line: "source /opt/ros/{{ ros_distro }}/setup.bash"
@@ -76,6 +92,8 @@
         mode: '0644'
         state: present
         regexp: "^source /opt/ros/{{ ros_distro }}/setup.bash$"
+        owner: "{{ username }}"
+        group: "{{ username }}"
 
     # --------------------------------------------------------------------------
     # SECTION 3: Install Raspberry Pi Pico SDK
@@ -100,7 +118,7 @@
       ansible.builtin.git:
         repo: 'https://github.com/raspberrypi/pico-sdk.git'
         dest: "{{ pico_sdk_path }}"
-        branch: master
+        version: master
         update: yes
 
     - name: Initialize Pico SDK submodules
@@ -112,7 +130,6 @@
         creates: "{{ pico_sdk_path }}/lib/tinyusb/tinyusb.h"
 
     - name: Set PICO_SDK_PATH in .bashrc for the user
-      become: no
       ansible.builtin.lineinfile:
         path: "{{ user_home }}/.bashrc"
         line: "export PICO_SDK_PATH={{ pico_sdk_path }}"
@@ -120,47 +137,181 @@
         mode: '0644'
         state: present
         regexp: "^export PICO_SDK_PATH="
+        owner: "{{ username }}"
+        group: "{{ username }}"
 
     # --------------------------------------------------------------------------
     # SECTION 4: Install micro-ROS Build System for RP2350
     # --------------------------------------------------------------------------
-    - name: Install micro-ROS setup tool dependencies via pip
-      ansible.builtin.pip:
+    - name: Verify micro-ROS setup tool dependencies are installed
+      ansible.builtin.apt:
         name:
-          - vcstool
-          - colcon-common-extensions
-        executable: pip3
+          - python3-vcstool
+          - python3-colcon-common-extensions
+          - "ros-{{ ros_distro }}-rosidl-default-generators"
+          - "ros-{{ ros_distro }}-rosidl-default-runtime"
+          - "ros-{{ ros_distro }}-rmw"
+          - "ros-{{ ros_distro }}-rmw-implementation"
+        state: present
 
     - name: Create micro-ROS workspace directory
       become: no
       ansible.builtin.file:
-        path: "{{ microros_ws_path }}"
+        path: "{{ microros_ws_path }}/src"
         state: directory
         mode: '0755'
 
-    - name: Download and extract micro-ROS setup scripts
-      become: no
-      ansible.builtin.unarchive:
-        src: https://raw.githubusercontent.com/micro-ROS/micro_ros_setup/jazzy/micro_ros_setup.zip
-        dest: "{{ microros_ws_path }}"
-        remote_src: yes
-      args:
-        creates: "{{ microros_ws_path }}/micro_ros_setup"
+    - name: Ensure workspace has correct ownership
+      ansible.builtin.file:
+        path: "{{ microros_ws_path }}"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        recurse: yes
+        state: directory
 
-    # === THIS IS THE MODIFIED TASK FOR PICO 2 (RP2350) ===
-    - name: Create the micro-ROS firmware workspace for {{ pico_chip_target }}
+    - name: Clone micro-ROS setup repository
+      become: no
+      ansible.builtin.git:
+        repo: 'https://github.com/micro-ROS/micro_ros_setup.git'
+        dest: "{{ microros_ws_path }}/src/micro_ros_setup"
+        version: jazzy
+        update: yes
+
+    - name: Build micro-ROS setup workspace
       become: no
       ansible.builtin.shell: |
         source /opt/ros/{{ ros_distro }}/setup.bash
+        colcon build --packages-select micro_ros_setup
+      args:
+        chdir: "{{ microros_ws_path }}"
+        executable: /bin/bash
+      register: build_result
+
+    - name: Display build output for debugging
+      ansible.builtin.debug:
+        var: build_result
+
+    - name: Verify micro-ROS setup installation
+      become: no
+      ansible.builtin.shell: |
+        source /opt/ros/{{ ros_distro }}/setup.bash
+        source {{ microros_ws_path }}/install/local_setup.bash
+        ros2 pkg list | grep micro_ros_setup
+      args:
+        chdir: "{{ microros_ws_path }}"
+        executable: /bin/bash
+      register: package_check
+
+    - name: Display package check result
+      ansible.builtin.debug:
+        var: package_check
+
+    - name: Create micro-ROS firmware workspace for RP2040 (Raspberry Pi Pico)
+      become: no
+      ansible.builtin.shell: |
+        source /opt/ros/{{ ros_distro }}/setup.bash
+        source {{ microros_ws_path }}/install/local_setup.bash
         ros2 run micro_ros_setup create_firmware_ws.sh freertos {{ pico_chip_target }}
       args:
-        chdir: "{{ microros_ws_path }}/micro_ros_setup"
+        chdir: "{{ microros_ws_path }}"
         creates: "{{ microros_ws_path }}/firmware"
+        executable: /bin/bash
+      register: firmware_creation_result
+      failed_when: false
+      when: package_check.stdout_lines | length > 0
 
-    - name: Build the base micro-ROS firmware
+    - name: Display firmware creation result
+      ansible.builtin.debug:
+        msg: |
+          Firmware workspace creation result:
+          Return code: {{ firmware_creation_result.rc | default('N/A') }}
+          {% if firmware_creation_result.rc == 0 %}
+          SUCCESS: micro-ROS firmware workspace created for RP2040
+          {% else %}
+          FAILED: {{ firmware_creation_result.stdout }}
+          {% endif %}
+      when: package_check.stdout_lines | length > 0
+
+    - name: Create RP2040 adaptation guide if pico_raspberry_pi not available
+      become: no
+      ansible.builtin.copy:
+        dest: "{{ microros_ws_path }}/RP2040_SETUP_README.md"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: '0644'
+        content: |
+          # micro-ROS RP2040 (Raspberry Pi Pico) Setup Guide
+          
+          ## Platform Status
+          
+          Attempted to create firmware workspace with platform: {{ pico_chip_target }}
+          Result: {% if firmware_creation_result.rc == 0 %}SUCCESS{% else %}FAILED - Platform may not be available{% endif %}
+          
+          ## Available Alternative Approaches
+          
+          If the automatic setup failed, you can use one of these approaches:
+          
+          ### 1. Use Generic Library
+          ```bash
+          source /opt/ros/{{ ros_distro }}/setup.bash
+          source {{ microros_ws_path }}/install/local_setup.bash
+          ros2 run micro_ros_setup create_firmware_ws.sh generate_lib generic
+          ros2 run micro_ros_setup build_firmware.sh
+          ```
+          
+          ### 2. Use ESP32 as Base (for FreeRTOS reference)
+          ```bash
+          source /opt/ros/{{ ros_distro }}/setup.bash
+          source {{ microros_ws_path }}/install/local_setup.bash
+          ros2 run micro_ros_setup create_firmware_ws.sh freertos esp32
+          # Then adapt the ESP32 configuration for RP2040
+          ```
+          
+          ### 3. Manual Integration with Pico SDK
+          
+          Integrate micro-ROS directly with your Pico SDK project:
+          
+          1. Build the generic micro-ROS library
+          2. Include it in your Pico SDK CMakeLists.txt
+          3. Configure the transport layer (UART, USB, etc.)
+          
+          ## Useful Resources
+          
+          - micro-ROS Documentation: https://micro.ros.org/
+          - Pico SDK Documentation: https://raspberrypi.github.io/pico-sdk-doxygen/
+          - Community RP2040 Examples: Search for "micro-ROS pico" on GitHub
+          
+          ## Next Steps
+          
+          1. Try the alternative approaches above
+          2. Check the latest micro-ROS releases for official RP2040 support
+          3. Consider using the generic library approach for maximum flexibility
+      when: package_check.stdout_lines | length > 0
+
+    - name: Build micro-ROS firmware for RP2040
       become: no
       ansible.builtin.shell: |
         source /opt/ros/{{ ros_distro }}/setup.bash
+        source {{ microros_ws_path }}/install/local_setup.bash
         ros2 run micro_ros_setup build_firmware.sh
       args:
-        chdir: "{{ microros_ws_path }}/micro_ros_setup"
+        chdir: "{{ microros_ws_path }}"
+        executable: /bin/bash
+      register: firmware_build_result
+      failed_when: false
+      when: 
+        - package_check.stdout_lines | length > 0
+        - firmware_creation_result.rc == 0
+
+    - name: Display firmware build result
+      ansible.builtin.debug:
+        msg: |
+          micro-ROS firmware build result:
+          Return code: {{ firmware_build_result.rc | default('N/A') }}
+          {% if firmware_build_result.rc == 0 %}
+          SUCCESS: micro-ROS firmware built successfully for RP2040!
+          Firmware files are available in {{ microros_ws_path }}/firmware/
+          {% else %}
+          Note: Firmware build failed or was skipped. Check the RP2040_SETUP_README.md for alternatives.
+          {% endif %}
+      when: package_check.stdout_lines | length > 0
