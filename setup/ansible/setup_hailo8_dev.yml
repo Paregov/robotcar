@@ -1,0 +1,303 @@
+---
+- name: Setup Hailo-8 Development Environment (PC Host; deploy models to Raspberry Pi for inference)
+  hosts: localhost
+  connection: local
+  become: yes
+
+  vars:
+    hailo_sdk_tarball: "{{ lookup('env','HAILO_SDK_TARBALL') | default('', true) }}"
+    hailo_pip_wheel:  "{{ lookup('env','HAILO_PIP_WHEEL')  | default('', true) }}"
+    hailo_install_prefix: /opt/hailo
+    # Get the real invoking user (not root when using sudo/become)
+    original_user: "{{ lookup('env','SUDO_USER') | default(lookup('env','USER'), true) }}"
+    original_home: "{{ '/home/' + (lookup('env','SUDO_USER') | default(lookup('env','USER'), true)) }}"
+    python_venv_path: "{{ '/home/' + (lookup('env','SUDO_USER') | default(lookup('env','USER'), true)) + '/hailo8' }}"
+    user_home: "{{ '/home/' + (lookup('env','SUDO_USER') | default(lookup('env','USER'), true)) }}"
+    user_name: "{{ lookup('env','SUDO_USER') | default(lookup('env','USER'), true) }}"
+    # Raspberry Pi deployment (optional)
+    rpi_host: "{{ lookup('env','RPI_HOST') | default('', true) }}"
+    rpi_deploy_path: "/home/pi/hailo_runtime"
+    deploy_models_dir: "{{ '/home/' + (lookup('env','SUDO_USER') | default(lookup('env','USER'), true)) + '/hailo_models' }}"
+
+  pre_tasks:
+    - name: Display selected configuration
+      ansible.builtin.debug:
+        msg: |
+          Invoking user: {{ original_user }} (home: {{ original_home }})
+          Hailo SDK tarball: {{ hailo_sdk_tarball | default('NOT PROVIDED') }}
+          Hailo Python wheel: {{ hailo_pip_wheel | default('NOT PROVIDED') }}
+          Virtual env: {{ python_venv_path }}
+          Raspberry Pi target host: {{ rpi_host | default('NOT SET') }}
+
+  tasks:
+    - name: Provision Hailo-8 environment
+      block:
+        # ------------------------------------------------------------------
+        # System base & dependencies (PC)
+        # ------------------------------------------------------------------
+        - name: Update apt cache
+          ansible.builtin.apt:
+            update_cache: yes
+            cache_valid_time: 3600
+
+        - name: Install base development packages (PC)
+          ansible.builtin.apt:
+            name:
+              - build-essential
+              - git
+              - cmake
+              - pkg-config
+              - python3
+              - python3-venv
+              - python3-pip
+              - python3-dev
+              - libusb-1.0-0-dev
+              - libudev-dev
+              - udev
+              - wget
+              - unzip
+              - curl
+              - jq
+              - htop
+              - dkms
+              - net-tools
+              - lsb-release
+              - pciutils
+              - docker.io
+              - gstreamer1.0-tools
+              - gstreamer1.0-plugins-base
+              - gstreamer1.0-plugins-good
+              - gstreamer1.0-plugins-bad
+              - gstreamer1.0-libav
+              - ffmpeg
+              - linux-headers-generic
+            state: present
+
+        - name: Add current user to docker group (for optional container workflows)
+          ansible.builtin.user:
+            name: "{{ user_name }}"
+            groups: docker
+            append: yes
+
+        # ------------------------------------------------------------------
+        # Python virtual environment
+        # ------------------------------------------------------------------
+        - name: Create Python virtual environment
+          ansible.builtin.command: python3 -m venv {{ python_venv_path }}
+          args:
+            creates: "{{ python_venv_path }}/bin/activate"
+          become: false
+
+        - name: Upgrade pip & core tools inside venv
+          become: false
+          ansible.builtin.shell: |
+            source {{ python_venv_path }}/bin/activate
+            python -m pip install --upgrade pip wheel setuptools
+          args:
+            executable: /bin/bash
+
+        - name: Install common Python ML / tooling packages inside venv
+          become: false
+          ansible.builtin.shell: |
+            source {{ python_venv_path }}/bin/activate
+            pip install numpy pillow opencv-python onnx onnxruntime pyusb coloredlogs rich
+          args:
+            executable: /bin/bash
+
+        - name: Optionally install Hailo Python wheel if provided
+          become: false
+          ansible.builtin.shell: |
+            source {{ python_venv_path }}/bin/activate
+            pip install "{{ hailo_pip_wheel }}"
+          when: hailo_pip_wheel | length > 0
+          args:
+            executable: /bin/bash
+
+        # ------------------------------------------------------------------
+        # Hailo SDK (PC Host)
+        # ------------------------------------------------------------------
+        - name: Create Hailo install directory
+          ansible.builtin.file:
+            path: "{{ hailo_install_prefix }}"
+            state: directory
+            mode: '0755'
+
+        - name: Download Hailo SDK if not provided via environment variable
+          ansible.builtin.get_url:
+            url: "https://hailo.ai/developer-zone/software-downloads/hailort/"
+            dest: /tmp/hailo_download_page.html
+            mode: '0644'
+          when: hailo_sdk_tarball | length == 0
+          ignore_errors: true
+          register: hailo_download_result
+
+        - name: Display SDK download information
+          ansible.builtin.debug:
+            msg: |
+              Hailo SDK can be downloaded from: https://hailo.ai/developer-zone/software-downloads/hailort/
+              Please download the HailoRT SDK for Ubuntu and set HAILO_SDK_TARBALL environment variable.
+              Alternatively, you can manually download and extract to {{ hailo_install_prefix }}
+          when: hailo_sdk_tarball | length == 0
+
+        - name: Check if Hailo SDK is already installed
+          ansible.builtin.stat:
+            path: "{{ hailo_install_prefix }}/lib/libhailort.so"
+          register: hailo_lib_check
+
+        - name: Copy Hailo SDK tarball into place
+          ansible.builtin.copy:
+            src: "{{ hailo_sdk_tarball }}"
+            dest: "/tmp/hailo_sdk.tar.gz"
+            mode: '0644'
+          when: hailo_sdk_tarball | length > 0
+
+        - name: Extract Hailo SDK
+          ansible.builtin.unarchive:
+            src: /tmp/hailo_sdk.tar.gz
+            dest: "{{ hailo_install_prefix }}"
+            remote_src: yes
+            extra_opts: ['--strip-components=1']
+          when: hailo_sdk_tarball | length > 0
+
+        - name: Install Hailo runtime libraries system-wide
+          ansible.builtin.shell: |
+            if [ -f "{{ hailo_install_prefix }}/install.sh" ]; then
+              cd {{ hailo_install_prefix }}
+              chmod +x install.sh
+              ./install.sh
+            elif [ -d "{{ hailo_install_prefix }}/lib" ]; then
+              cp -r {{ hailo_install_prefix }}/lib/* /usr/local/lib/
+              cp -r {{ hailo_install_prefix }}/include/* /usr/local/include/ 2>/dev/null || true
+              ldconfig
+            fi
+          when: hailo_sdk_tarball | length > 0
+          args:
+            executable: /bin/bash
+
+        - name: Install Hailo Python packages in virtual environment
+          become: false
+          ansible.builtin.shell: |
+            source {{ python_venv_path }}/bin/activate
+            # Install hailort Python bindings if available
+            if [ -f "{{ hailo_install_prefix }}/hailort-*-py3-none-linux_x86_64.whl" ]; then
+              pip install {{ hailo_install_prefix }}/hailort-*-py3-none-linux_x86_64.whl
+            fi
+            # Install additional Hailo tools
+            pip install hailo-platform hailo-model-zoo || echo "Hailo platform packages not available via pip"
+          when: hailo_sdk_tarball | length > 0
+          args:
+            executable: /bin/bash
+          ignore_errors: true
+
+        - name: Install Hailo PCIe driver if available
+          ansible.builtin.shell: |
+            if [ -f "{{ hailo_install_prefix }}/drivers/hailo_pci.ko" ]; then
+              # Install PCIe driver
+              cp {{ hailo_install_prefix }}/drivers/* /lib/modules/$(uname -r)/kernel/drivers/misc/ 2>/dev/null || true
+              depmod -a
+              modprobe hailo_pci || echo "PCIe driver installation failed or not needed"
+            fi
+          when: hailo_sdk_tarball | length > 0
+          args:
+            executable: /bin/bash
+          ignore_errors: true
+
+        - name: Ensure environment exports in .bashrc
+          ansible.builtin.lineinfile:
+            path: "{{ user_home }}/.bashrc"
+            line: "{{ item }}"
+            create: yes
+            mode: '0644'
+            state: present
+          loop:
+            - 'export HAILO_SDK_PATH={{ hailo_install_prefix }}'
+            - 'export PATH=$HAILO_SDK_PATH/bin:{{ python_venv_path }}/bin:$PATH'
+            - 'export LD_LIBRARY_PATH=$HAILO_SDK_PATH/lib:$LD_LIBRARY_PATH'
+            - 'export PYTHONPATH=$HAILO_SDK_PATH/lib/python:$PYTHONPATH'
+          when: hailo_sdk_tarball | length > 0 or hailo_lib_check.stat.exists
+
+        - name: Add venv activation alias (always)
+          ansible.builtin.lineinfile:
+            path: "{{ user_home }}/.bashrc"
+            line: "alias hailoenv='source {{ python_venv_path }}/bin/activate'"
+            state: present
+            create: yes
+            mode: '0644'
+
+        # ------------------------------------------------------------------
+        # Udev rules (example)
+        # ------------------------------------------------------------------
+        - name: Install udev rules for Hailo devices (placeholder IDs)
+          ansible.builtin.copy:
+            dest: /etc/udev/rules.d/99-hailo.rules
+            content: |
+              # Replace idVendor/idProduct with actual values from `lsusb` for your Hailo device
+              SUBSYSTEM=="usb", ATTR{idVendor}=="1e60", MODE="0666"
+            mode: '0644'
+
+        - name: Reload udev rules
+          ansible.builtin.shell: udevadm control --reload && udevadm trigger
+          args:
+            executable: /bin/bash
+          changed_when: false
+
+        # ------------------------------------------------------------------
+        # OPTIONAL: Deploy artifacts/models to Raspberry Pi target
+        # ------------------------------------------------------------------
+        - name: Ensure local models directory exists
+          ansible.builtin.file:
+            path: "{{ deploy_models_dir }}"
+            state: directory
+            mode: '0755'
+          when: rpi_host | length > 0
+
+        - name: Create remote deploy directory on Raspberry Pi
+          ansible.builtin.shell: |
+            ssh {{ rpi_host }} "mkdir -p {{ rpi_deploy_path }}"
+          when: rpi_host | length > 0
+          changed_when: false
+
+        - name: Rsync models / artifacts to Raspberry Pi
+          ansible.builtin.shell: |
+            rsync -av --delete {{ deploy_models_dir }}/ {{ rpi_host }}:{{ rpi_deploy_path }}/
+          when: rpi_host | length > 0
+          changed_when: false
+          tags: [deploy_rpi]
+
+        - name: Append helper alias for remote run (added once)
+          ansible.builtin.lineinfile:
+            path: "{{ user_home }}/.bashrc"
+            line: "alias hailo-rpi-shell='ssh {{ rpi_host }}'"
+            state: present
+          when: rpi_host | length > 0
+
+        # ------------------------------------------------------------------
+        # Verification steps
+        # ------------------------------------------------------------------
+        - name: Verify venv Python version
+          become: false
+          ansible.builtin.shell: |
+            source {{ python_venv_path }}/bin/activate
+            python --version
+          register: py_ver
+          args:
+            executable: /bin/bash
+
+        - name: Show summary
+          ansible.builtin.debug:
+            msg: |
+              Hailo environment setup completed (PC host).
+              Python: {{ py_ver.stdout }}
+              Virtual env: {{ python_venv_path }}
+              SDK installed: {{ (hailo_sdk_tarball | length > 0) | ternary('yes','no (provide later)') }}
+              Raspberry Pi target: {{ rpi_host | default('not configured') }}
+              To start: source {{ user_home }}/.bashrc && hailoenv
+              To deploy (after adding models): ansible-playbook setup_hailo8_dev.yml --tags deploy_rpi
+
+      rescue:
+        - name: Report failure
+          ansible.builtin.debug:
+            msg: "Hailo-8 setup encountered a failure. Review previous task output."
+
+  tags:
+    - hailo
